@@ -127,3 +127,11 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Intellij
+.idea/
+
+# For development
+test.py
+*.log
+config.ini
