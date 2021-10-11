@@ -6,7 +6,7 @@ import toml  # noqa: F401
 setup(
     name="Differential",
     packages=find_packages(include=["differential", "differential.*"]),
-    long_description=open("README.md", "r").read(),
+    long_description=open("README.md", "r", encoding='utf-8').read(),
     long_description_content_type="text/markdown",
     description="a Python script for easy uploading torrents to varies PT sites.",
     author="Lei Shi",
