@@ -132,6 +132,7 @@ dmypy.json
 .idea/
 
 # For development
+.vscode
 test.py
 *.log
 config.ini
