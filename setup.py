@@ -1,19 +1,17 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
-
-from differential.version import version
+import setuptools_scm  # noqa: F401
+import toml  # noqa: F401
 
 setup(
     name="Differential",
     packages=find_packages(include=["differential", "differential.*"]),
-    version=version,
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
     description="a Python script for easy uploading torrents to varies PT sites.",
     author="Lei Shi",
     author_email="me@leishi.io",
     url="https://github.com/leishi1313/Differential",
-    download_url="https://github.com/leishi1313/Differential/archive/{}.tar.gz".format(version),
     keywords=["PT", "mediainfo", "ptgen", "ptpimg"],
     classifiers=[
         "Environment :: Console",
