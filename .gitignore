@@ -136,3 +136,4 @@ dmypy.json
 test.py
 *.log
 config.ini
+differential/version.py
