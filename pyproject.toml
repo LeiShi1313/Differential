@@ -4,7 +4,6 @@ requires = [
     "setuptools_scm[toml] >= 4, <6",
     "setuptools_scm_git_archive",
     "wheel >= 0.29.0",
-    "differential"
 ]
 build-backend = 'setuptools.build_meta'
 
