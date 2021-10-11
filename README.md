@@ -11,7 +11,7 @@
 
 # 如何使用
 
-差速器现在支持未经过重大修改的NexusPHP站点。在使用前，请先使用`python differential/main.py -h`查看本工具现有的插件。如果你需要的站点没有支持，可以尝试`NexusPHP`插件并手动指定发种页面，其他的参数还请参考`python differential/main.py nexusphp -h`和`config.ini`。
+差速器现在支持未经过重大修改的NexusPHP站点。在使用前，请先使用`python differential/main.py -h`查看本工具现有的插件。如果你需要的站点没有支持，可以尝试`NexusPHP`插件并手动指定发种页面，其他的参数还请参考`python differential/main.py nexusphp -h`和`config.ini.example`。
 
 TODO
 
