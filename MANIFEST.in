@@ -1,1 +1,2 @@
+include pyproject.toml
 exclude usage.gif

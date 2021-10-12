@@ -59,7 +59,7 @@ def execute(binary_name: str, args: str, abort: bool = False) -> str:
             return ''
     cmd = f'"{executable}" {args}'
     logger.trace(cmd)
-    proc = subprocess.run(cmd, shell=True, capture_output=True)
+    proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     logger.trace(proc)
     return "\n".join([proc.stdout.decode(), proc.stderr.decode()])
 
