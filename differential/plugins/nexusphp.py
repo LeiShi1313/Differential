@@ -315,9 +315,12 @@ class NexusPHP(Base):
             "title": self.title,
             "subtitle": self.subtitle,
             "description": self.description,
+            "originalDescription": '',
             "doubanUrl": self.doubanUrl,
+            "doubanInfo": '',
             "imdbUrl": self.imdbUrl,
             "mediaInfo": self.mediaInfo,
+            "mediaInfos": [self.mediaInfo],
             "screenshots": self.screenshots,
             "poster": self.poster,
             "year": self.year,
@@ -333,6 +336,9 @@ class NexusPHP(Base):
             "movieName": self.movieName,
             "size": self.size,
             "tags": self.tags,
+            "otherTags": [],
+            "comparisons": [],
+            "isForbidden": False
         }
 
     def upload(self):
