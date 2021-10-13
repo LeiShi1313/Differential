@@ -16,6 +16,7 @@ from torf import Torrent
 from loguru import logger
 from pymediainfo import MediaInfo
 
+from differential.version import version
 from differential.constants import ImageHosting
 from differential.utils import ffprobe, execute, make_torrent_progress, get_track_attr
 
@@ -102,7 +103,7 @@ class Base(ABC, metaclass=PluginRegister):
         make_torrent: bool = False,
         **kwargs,
     ):
-        self.folder = folder
+        self.folder = Path(folder)
         self.url = url
         self.screenshot_count = screenshot_count
         self.optimize_screenshot = optimize_screenshot
@@ -217,23 +218,32 @@ class Base(ABC, metaclass=PluginRegister):
 
     def upload_screenshots(self, img_dir: str) -> list:
         img_urls = []
-        for count, img in enumerate(sorted(Path(img_dir).iterdir())):
+        for count, img in enumerate(sorted(Path(img_dir).glob("*.png"))):
             if img.is_file() and img.name.lower().endswith('png'):
-                logger.info(f"正在上传第{count + 1}张截图...")
-                upload_func = None
-                if self.image_hosting == ImageHosting.PTPIMG:
-                    upload_func = self.ptpimg_upload
-                elif self.image_hosting == ImageHosting.CHEVERETO:
-                    upload_func = self.chevereto_upload
-                elif self.image_hosting == ImageHosting.IMGURL:
-                    upload_func = self.imgurl_upload
-                elif self.image_hosting == ImageHosting.SMMS:
-                    upload_func = self.smms_upload
+                img_url = None
+                img_url_file = img.resolve().parent.joinpath(".{}.{}".format(self.image_hosting.value, img.stem))
+                if img_url_file.is_file():
+                    with open(img_url_file, 'r') as f:
+                        img_url = f.read().strip()
+                        logger.info(f"发现已上传的第{count + 1}张截图链接：{img_url}")
+                else:
+                    upload_func = None
+                    if self.image_hosting == ImageHosting.PTPIMG:
+                        upload_func = self.ptpimg_upload
+                    elif self.image_hosting == ImageHosting.CHEVERETO:
+                        upload_func = self.chevereto_upload
+                    elif self.image_hosting == ImageHosting.IMGURL:
+                        upload_func = self.imgurl_upload
+                    elif self.image_hosting == ImageHosting.SMMS:
+                        upload_func = self.smms_upload
 
-                if upload_func:
-                    img_url = upload_func(img)
-                    if img_url:
-                        img_urls.append(img_url)
+                    if upload_func:
+                        img_url = upload_func(img)
+                        logger.info(f"正在上传第{count + 1}张截图：{img_url}")
+                if img_url:
+                    with open(img_url_file, 'w') as f:
+                        f.write(img_url)
+                    img_urls.append(img_url)
                 else:
                     logger.warning(f'Image hosting: {self.image_hosting} not supported!')
                     break
@@ -269,21 +279,20 @@ class Base(ABC, metaclass=PluginRegister):
     def _get_mediainfo(self) -> MediaInfo:
         # Always find the biggest file in the folder
         logger.info(f"正在获取Mediainfo: {self.folder}")
-        if os.path.isfile(self.folder):
-            self._main_file = Path(self.folder)
+        if self.folder.is_file():
+            self._main_file = self.folder
         else:
             logger.info("目标为文件夹，正在获取最大的文件...")
             biggest_size = -1
             biggest_file = None
-            for root, _, files in os.walk(self.folder):
-                for file in files:
-                    full_path = os.path.join(root, file)
-                    s = os.stat(full_path).st_size
+            for f in self.folder.glob('**/*'):
+                if f.is_file():
+                    s = os.stat(f.absolute()).st_size
                     if s > biggest_size:
                         biggest_size = s
-                        biggest_file = full_path
+                        biggest_file = f
             if biggest_file:
-                self._main_file = Path(biggest_file)
+                self._main_file = biggest_file
         if self._main_file is None:
             logger.error("未在目标目录找到文件！")
             sys.exit(1)
@@ -334,12 +343,11 @@ class Base(ABC, metaclass=PluginRegister):
 
     def _generate_nfo(self):
         logger.info("正在生成nfo文件...")
-        p = Path(self.folder)
-        if p.is_file():
-            with open(f"{p.resolve().parent.joinpath(p.stem)}.nfo", 'wb') as f:
+        if self.folder.is_file():
+            with open(f"{self.folder.resolve().parent.joinpath(self.folder.stem)}.nfo", 'wb') as f:
                 f.write(self.mediaInfo.encode())
-        elif p.is_dir():
-            with open(p.joinpath(f"{p.name}.nfo"), 'wb') as f:
+        elif self.folder.is_dir():
+            with open(self.folder.joinpath(f"{self.folder.name}.nfo"), 'wb') as f:
                 f.write(self.mediaInfo.encode())
 
     def _get_screenshots(self) -> list:
@@ -382,36 +390,44 @@ class Base(ABC, metaclass=PluginRegister):
             f"PAR: {pixel_aspect_ratio}, resolution: {resolution}"
         )
 
-        # 生成截图
-        temp_dir = tempfile.mkdtemp()
-        for i in range(1, self.screenshot_count + 1):
-            logger.info(f"正在生成第{i}张截图...")
-            t = int(i * duration / (self.screenshot_count + 1))
-            screenshot_path = f'{temp_dir}/{self._main_file.stem}.thumb_{str(i).zfill(2)}.png'
-            execute("ffmpeg", (
-                f'-y -ss {t}ms -skip_frame nokey -i "{self._main_file.absolute()}" '
-                f'-s {resolution} -vsync 0 -vframes 1 -c:v png -v quiet "{screenshot_path}"'))
-            if self.optimize_screenshot:
-                image = Image.open(screenshot_path)
-                image.save(f"{screenshot_path}", format="PNG", optimized=True)
+        temp_dir = None
+        # 查找已有的截图
+        for f in Path(tempfile.gettempdir()).glob("Differential*"):
+            if f.is_dir() and self.folder.name in f.name:
+                if len(list(f.glob("*.png"))) == self.screenshot_count:
+                    temp_dir = f.absolute()
+                    logger.info("发现已生成的{}张截图，跳过截图...".format(self.screenshot_count))
+                    break
+        else:
+            temp_dir = tempfile.mkdtemp(prefix="Differential.{}.".format(version), suffix=self.folder.name)
+            # 生成截图
+            for i in range(1, self.screenshot_count + 1):
+                logger.info(f"正在生成第{i}张截图...")
+                t = int(i * duration / (self.screenshot_count + 1))
+                screenshot_path = f'{temp_dir}/{self._main_file.stem}.thumb_{str(i).zfill(2)}.png'
+                execute("ffmpeg", (
+                    f'-y -ss {t}ms -skip_frame nokey -i "{self._main_file.absolute()}" '
+                    f'-s {resolution} -vsync 0 -vframes 1 -c:v png -v quiet "{screenshot_path}"'))
+                if self.optimize_screenshot:
+                    image = Image.open(screenshot_path)
+                    image.save(f"{screenshot_path}", format="PNG", optimized=True)
 
         # 上传截图
         screenshots = self.upload_screenshots(temp_dir)
         logger.trace(f"Collected screenshots: {screenshots}")
 
         # 删除临时文件夹
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        # shutil.rmtree(temp_dir, ignore_errors=True)
 
         return screenshots
 
     def _mktorrent(self):
         logger.info("正在生成种子...")
-        p = Path(self.folder)
         t = Torrent(path=self.folder, trackers=[self.announce_url],
-                    comment=f"Generate by Differential made by XGCM")
+                    comment=f"Generate by Differential {version} made by XGCM")
         t.private = True
         t.generate(callback=make_torrent_progress, interval=1)
-        t.write(p.resolve().parent.joinpath(f"{p.name if p.is_dir() else p.stem}.torrent"), overwrite=True)
+        t.write(self.folder.resolve().parent.joinpath(f"{self.folder.name if self.folder.is_dir() else self.folder.stem}.torrent"), overwrite=True)
 
     def _prepare(self):
         ptgen_retry = self.ptgen_retry
@@ -429,9 +445,9 @@ class Base(ABC, metaclass=PluginRegister):
     @property
     def title(self):
         # TODO: Either use file name or generate from mediainfo and ptgen
-        temp_name = Path(self.folder).stem.replace('.', ' ')
-        temp_name = temp_name.replace(' 5 1 ', ' 5.1 ')
-        temp_name = temp_name.replace(' 7 1 ', ' 7.1 ')
+        temp_name = (self.folder.name if self.folder.is_dir() else self.folder.stem).replace('.', ' ')
+        temp_name = temp_name.replace('5 1 ', '5.1 ')
+        temp_name = temp_name.replace('7 1 ', '7.1 ')
         return temp_name
 
     @property
@@ -518,19 +534,19 @@ class Base(ABC, metaclass=PluginRegister):
 
     @property
     def videoType(self):
-        if "webdl" in self.folder.lower() or "web-dl" in self.folder.lower():
+        if "webdl" in self.folder.name.lower() or "web-dl" in self.folder.name.lower():
             return "web"
-        elif "remux" in self.folder.lower():
+        elif "remux" in self.folder.name.lower():
             return "remux"
-        elif "hdtv" in self.folder.lower():
+        elif "hdtv" in self.folder.name.lower():
             return "hdtv"
-        elif any(e in self.folder.lower() for e in ("x264", "x265")):
+        elif any(e in self.folder.name.lower() for e in ("x264", "x265")):
             return "encode"
-        elif "bluray" in self.folder.lower() and not any(
-            e in self.folder.lower() for e in ("x264", "x265")
+        elif "bluray" in self.folder.name.lower() and not any(
+            e in self.folder.name.lower() for e in ("x264", "x265")
         ):
             return "bluray"
-        elif "uhd" in self.folder.lower():
+        elif "uhd" in self.folder.name.lower():
             return "uhdbluray"
         for track in self._mediainfo.tracks:
             if track.track_type == "Video":
