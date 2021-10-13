@@ -295,12 +295,13 @@ class Base(ABC, metaclass=PluginRegister):
     def _get_full_mediainfo(self) -> str:
         track_format = {
             'general': ['Unique ID', 'Complete name', 'Format', 'Format version', 'Duration', 'Overall bit rate',
-                        'Encoded date', 'Writing application', 'Writing library'],
+                        'Encoded date', 'Writing application', 'Writing library', 'Attachments'],
             'video': ['ID', 'Format', 'Format/Info', 'Format profile', 'Codec ID', 'Duration', 'Bit rate', 'Width',
                       'Height', 'Display aspect ratio', 'Frame rate mode', 'Frame rate', 'Color space',
                       'Chroma subsampling', 'Bit depth', 'Bits/(Pixel*Frame)', 'Stream size', 'Writing library',
-                      'Encoding settings', 'Default', 'Forced', 'Color range', 'Color primaries',
-                      'Transfer characteristics', 'Matrix coefficients'],
+                      'Encoding settings', 'Title', 'Default', 'Forced', 'Color range', 'Color primaries',
+                      'Transfer characteristics', 'Matrix coefficients', 'Mastering display color primaries',
+                      'Mastering display luminance', 'Maximum Content Light Level', 'Maximum Frame-Average Light Level'],
             'audio': ['ID', 'Format', 'Format/Info', 'Commercial name', 'Codec ID', 'Duration', 'Bit rate mode',
                       'Bit rate', 'Channel(s)', 'Channel layout', 'Sampling rate', 'Frame rate', 'Compression mode',
                       'Stream size', 'Title', 'Language', 'Service kind', 'Default', 'Forced'],

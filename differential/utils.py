@@ -96,6 +96,8 @@ def get_track_attr(track: Track, name) -> Optional[str]:
         alternative_name = 'channel_s'
     elif name == 'Bits/(Pixel*Frame)':
         alternative_name = 'bits__pixel_frame'
+    elif name == 'Maximum Frame-Average Light Level':
+        alternative_name = 'maximum_frameaverage_light_level'
 
     attr = None
     if alternative_name:
