@@ -21,6 +21,7 @@ from differential.constants import ImageHosting
 from differential.utils import ffprobe, execute, make_torrent_progress, get_track_attr
 
 PARSER = argparse.ArgumentParser(description="Differential - 差速器 PT快速上传工具")
+PARSER.add_argument('-v', '--version', help="显示差速器当前版本", action='version', version=f"Differential {version}")
 subparsers = PARSER.add_subparsers(help="使用下列插件名字来查看插件的详细用法")
 REGISTERED_PLUGINS = {}
 
