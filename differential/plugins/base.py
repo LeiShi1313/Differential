@@ -18,7 +18,12 @@ from pymediainfo import MediaInfo
 
 from differential.version import version
 from differential.constants import ImageHosting
-from differential.utils import ffprobe, execute, make_torrent_progress, get_track_attr
+from differential.utils.torrent import make_torrent
+from differential.utils.binary import ffprobe, execute
+from differential.utils.mediainfo import get_track_attr
+from differential.utils.mediainfo import get_full_mediainfo
+from differential.utils.image import ptpimg_upload, smms_upload, imgurl_upload, chevereto_api_upload, chevereto_cookie_upload
+
 
 PARSER = argparse.ArgumentParser(description="Differential - 差速器 PT快速上传工具")
 PARSER.add_argument('-v', '--version', help="显示差速器当前版本", action='version', version=f"Differential {version}")
@@ -75,9 +80,12 @@ class Base(ABC, metaclass=PluginRegister):
                             default=argparse.SUPPRESS)
         parser.add_argument('--image-hosting', type=ImageHosting,
                             help=f"图床的类型，现在支持{','.join(i.value for i in ImageHosting)}", default=argparse.SUPPRESS)
-        parser.add_argument('--image-hosting-url', type=str, help="图床地址，非自建的图床可不填", default=argparse.SUPPRESS)
+        parser.add_argument('--imgurl-hosting-url', type=str, help="自建imgurl图床的地址", default=argparse.SUPPRESS)
+        parser.add_argument('--chevereto-hosting-url', type=str, help="自建chevereto图床的地址", default=argparse.SUPPRESS)
         parser.add_argument('--ptpimg-api-key', type=str, help="PTPIMG的API Key", default=argparse.SUPPRESS)
-        parser.add_argument('--chevereto-api-key', type=str, help="自建Chevereto的API Key", default=argparse.SUPPRESS)
+        parser.add_argument('--chevereto-api-key', type=str, help="自建Chevereto的API Key，详情见https://v3-docs.chevereto.com/api/#api-call", default=argparse.SUPPRESS)
+        parser.add_argument('--chevereto-cookie', type=str, help="如果自建Chevereto的API未开放，请设置auth token和cookie", default=argparse.SUPPRESS)
+        parser.add_argument('--chevereto-auth-token', type=str, help="如果自建Chevereto的API未开放，请设置auth token和cookie", default=argparse.SUPPRESS)
         parser.add_argument('--imgurl-api-key', type=str, help="Imgurl的API Key", default=argparse.SUPPRESS)
         parser.add_argument('--smms-api-key', type=str, help="SM.MS的API Key", default=argparse.SUPPRESS)
         parser.add_argument('--ptgen-url', type=str, help="自定义PTGEN的地址", default=argparse.SUPPRESS)
@@ -92,9 +100,12 @@ class Base(ABC, metaclass=PluginRegister):
         screenshot_count: int = 0,
         optimize_screenshot: bool = True,
         image_hosting: ImageHosting = ImageHosting.PTPIMG,
-        image_hosting_url: str = "",
+        chevereto_hosting_url: str = '',
+        imgurl_hosting_url: str = '',
         ptpimg_api_key: str = None,
         chevereto_api_key: str = None,
+        chevereto_cookie: str = None,
+        chevereto_auth_token: str = None,
         imgurl_api_key: str = None,
         smms_api_key: str = None,
         ptgen_url: str = "https://ptgen.lgto.workers.dev",
@@ -109,8 +120,11 @@ class Base(ABC, metaclass=PluginRegister):
         self.screenshot_count = screenshot_count
         self.optimize_screenshot = optimize_screenshot
         self.image_hosting = image_hosting
-        self.image_hosting_url = image_hosting_url
+        self.chevereto_hosting_url = chevereto_hosting_url
+        self.imgurl_hosting_url = imgurl_hosting_url
         self.ptpimg_api_key = ptpimg_api_key
+        self.chevereto_cookie = chevereto_cookie
+        self.chevereto_auth_token = chevereto_auth_token
         self.chevereto_api_key = chevereto_api_key
         self.imgurl_api_key = imgurl_api_key
         self.smms_api_key = smms_api_key
@@ -126,96 +140,6 @@ class Base(ABC, metaclass=PluginRegister):
         self._mediainfo: Optional[MediaInfo] = None
         self._screenshots: list = []
 
-    def ptpimg_upload(self, img: Path) -> Optional[str]:
-        data = {'api_key': self.ptpimg_api_key}
-        files = {'file-upload[0]': open(img, 'rb')}
-        req = requests.post('https://ptpimg.me/upload.php', data=data, files=files)
-
-        try:
-            res = req.json()
-            logger.trace(res)
-        except json.decoder.JSONDecodeError:
-            res = {}
-        if not req.ok:
-            logger.trace(req.content)
-            logger.warning(
-                f"上传图片失败: HTTP {req.status_code}, reason: {req.reason}")
-            return None
-        if len(res) < 1 or 'code' not in res[0] or 'ext' not in res[0]:
-            logger.warning(f"图片直链获取失败")
-            return None
-        return f"https://ptpimg.me/{res[0].get('code')}.{res[0].get('ext')}"
-
-    def chevereto_upload(self, img: Path) -> Optional[str]:
-        data = {'key': self.chevereto_api_key}
-        files = {'source': open(img, 'rb')}
-        req = requests.post(f'{self.image_hosting_url}/api/1/upload', data=data, files=files)
-
-        try:
-            res = req.json()
-            logger.trace(res)
-        except json.decoder.JSONDecodeError:
-            res = {}
-        if not req.ok:
-            logger.trace(req.content)
-            logger.warning(
-                f"上传图片失败: HTTP {req.status_code}, reason: {req.reason} "
-                f"{res['error'].get('message') if 'error' in res else ''}")
-            return None
-        if 'error' in res:
-            logger.warning(f"上传图片失败: [{res['error'].get('code')}]{res['error'].get('message')}")
-            return None
-        if 'image' not in res or 'url' not in res['image']:
-            logger.warning(f"图片直链获取失败")
-            return None
-        return res['image']['url']
-
-    def imgurl_upload(self, img: Path) -> Optional[str]:
-        data = {'token': self.imgurl_api_key}
-        files = {'file': open(img, 'rb')}
-        req = requests.post(f'{self.image_hosting_url}/api/upload', data=data, files=files)
-
-        try:
-            res = req.json()
-            logger.trace(res)
-        except json.decoder.JSONDecodeError:
-            res = {}
-        if not req.ok:
-            logger.trace(req.content)
-            logger.warning(
-                f"上传图片失败: HTTP {req.status_code}, reason: {req.reason} "
-                f"{res.get('msg') if 'msg' in res else ''}")
-            return None
-        if res.get('code') > 200:
-            logger.warning(f"上传图片失败: [{res.get('code')}]{res.get('msg')}")
-            return None
-        return res.get('url')
-
-    def smms_upload(self, img: Path) -> Optional[str]:
-        data = {'Authorization': self.smms_api_key}
-        files = {'smfile': open(img, 'rb'), 'format': 'json'}
-        req = requests.post('https://sm.ms/api/v2/upload', data=data, files=files)
-
-        try:
-            res = req.json()
-            logger.trace(res)
-        except json.decoder.JSONDecodeError:
-            res = {}
-        if not req.ok:
-            logger.trace(req.content)
-            logger.warning(
-                f"上传图片失败: HTTP {req.status_code}, reason: {req.reason} "
-                f"{res.get('msg') if 'msg' in res else ''}")
-            return None
-        if not res.get('success') and res.get('code') != 'image_repeated':
-            logger.warning(f"上传图片失败: [{res.get('code')}]{res.get('message')}")
-            return None
-        if res.get('code') == 'image_repeated':
-            return res.get('images')
-        if 'data' not in res or 'url' not in res['data']:
-            logger.warning(f"图片直链获取失败")
-            return None
-        return res['data']['url']
 
     def upload_screenshots(self, img_dir: str) -> list:
         img_urls = []
@@ -228,26 +152,30 @@ class Base(ABC, metaclass=PluginRegister):
                         img_url = f.read().strip()
                         logger.info(f"发现已上传的第{count + 1}张截图链接：{img_url}")
                 else:
-                    upload_func = None
                     if self.image_hosting == ImageHosting.PTPIMG:
-                        upload_func = self.ptpimg_upload
+                        img_url = ptpimg_api_upload(img, self.ptpimg_api_key)
                     elif self.image_hosting == ImageHosting.CHEVERETO:
-                        upload_func = self.chevereto_upload
+                        if not self.chevereto_hosting_url:
+                            logger.error("Chevereto地址未提供，请设置chevereto_hosting_url")
+                            sys.exit(1)
+                        if self.chevereto_api_key:
+                            img_url = chevereto_api_upload(img, self.chevereto_hosting_url, self.chevereto_api_key)
+                        elif self.chevereto_cookie and self.chevereto_auth_token:
+                            img_url = chevereto_cookie_upload(img, self.chevereto_hosting_url, self.chevereto_cookie, self.chevereto_auth_token)
+                        else:
+                            logger.error("Chevereto的API Key/Cookie均未设置，请检查chevereto-api-key/chevereto-cookie+chevereto-auth-token设置")
                     elif self.image_hosting == ImageHosting.IMGURL:
-                        upload_func = self.imgurl_upload
+                        img_url = imgurl_upload(img, self.imgurl_hosting_url, self.imgurl_api_key)
                     elif self.image_hosting == ImageHosting.SMMS:
-                        upload_func = self.smms_upload
+                        img_url = smms_upload(img, self.smms_api_key)
 
-                    if upload_func:
-                        img_url = upload_func(img)
-                        logger.info(f"正在上传第{count + 1}张截图：{img_url}")
                 if img_url:
+                    logger.info(f"第{count + 1}张截图地址：{img_url}")
                     with open(img_url_file, 'w') as f:
                         f.write(img_url)
                     img_urls.append(img_url)
                 else:
-                    logger.warning(f'Image hosting: {self.image_hosting} not supported!')
-                    break
+                    logger.info(f"第{count + 1}张截图上传失败，请自行上传：{img.resolve()}")
         return img_urls
 
     def _get_ptgen(self) -> dict:
@@ -301,46 +229,6 @@ class Base(ABC, metaclass=PluginRegister):
         logger.info(f"已获取Mediainfo: {self._main_file}")
         logger.trace(mediainfo.to_data())
         return mediainfo
-
-    def _get_full_mediainfo(self) -> str:
-        track_format = {
-            'general': ['Unique ID', 'Complete name', 'Format', 'Format version', 'Duration', 'Overall bit rate',
-                        'Encoded date', 'Writing application', 'Writing library', 'Attachments'],
-            'video': ['ID', 'Format', 'Format/Info', 'Format profile', 'Codec ID', 'Duration', 'Bit rate', 'Width',
-                      'Height', 'Display aspect ratio', 'Frame rate mode', 'Frame rate', 'Color space',
-                      'Chroma subsampling', 'Bit depth', 'Bits/(Pixel*Frame)', 'Stream size', 'Writing library',
-                      'Encoding settings', 'Title', 'Default', 'Forced', 'Color range', 'Color primaries',
-                      'Transfer characteristics', 'Matrix coefficients', 'Mastering display color primaries',
-                      'Mastering display luminance', 'Maximum Content Light Level', 'Maximum Frame-Average Light Level'],
-            'audio': ['ID', 'Format', 'Format/Info', 'Commercial name', 'Codec ID', 'Duration', 'Bit rate mode',
-                      'Bit rate', 'Channel(s)', 'Channel layout', 'Sampling rate', 'Frame rate', 'Compression mode',
-                      'Stream size', 'Title', 'Language', 'Service kind', 'Default', 'Forced'],
-            'text': ['ID', 'Format', 'Muxing mode', 'Codec ID', 'Codec ID/Info', 'Duration', 'Bit rate',
-                     'Count of elements', 'Stream size', 'Title', 'Language', 'Default', 'Forced'],
-        }
-        media_info = ''
-        for track_name in track_format.keys():
-            for idx, track in enumerate(getattr(self._mediainfo, "{}_tracks".format(track_name))):
-                if len(getattr(self._mediainfo, "{}_tracks".format(track_name))) > 1:
-                    media_info += "{} #{}\n".format(track_name.capitalize(), idx + 1)
-                else:
-                    media_info += "{}\n".format(track_name.capitalize())
-
-                media_info += '\n'.join(
-                    filter(lambda a: a is not None,
-                           [get_track_attr(track, name) for name in track_format[track_name]])) + '\n\n'
-        # Special treatment with charters
-        for track in self._mediainfo.menu_tracks:
-            # Assuming there are always one menu tracks
-            media_info += "Menu\n"
-            for name in dir(track):
-                # TODO: needs improvement
-                if name[:2].isdigit():
-                    media_info += "{} : {}\n".format(name[:-3].replace('_', ':') + '.' + name[-3:],
-                                                     getattr(track, name))
-            media_info += '\n'
-        media_info.strip()
-        return media_info
 
     def _generate_nfo(self):
         logger.info("正在生成nfo文件...")
@@ -422,14 +310,6 @@ class Base(ABC, metaclass=PluginRegister):
 
         return screenshots
 
-    def _mktorrent(self):
-        logger.info("正在生成种子...")
-        t = Torrent(path=self.folder, trackers=[self.announce_url],
-                    comment=f"Generate by Differential {version} made by XGCM")
-        t.private = True
-        t.generate(callback=make_torrent_progress, interval=1)
-        t.write(self.folder.resolve().parent.joinpath(f"{self.folder.name if self.folder.is_dir() else self.folder.stem}.torrent"), overwrite=True)
-
     def _prepare(self):
         ptgen_retry = self.ptgen_retry
         self._ptgen = self._get_ptgen()
@@ -441,7 +321,7 @@ class Base(ABC, metaclass=PluginRegister):
             self._generate_nfo()
         self._screenshots = self._get_screenshots()
         if self.make_torrent:
-            self._mktorrent()
+            make_torrent(self.folder, [self.announce_url])
 
     @property
     def title(self):
@@ -472,7 +352,7 @@ class Base(ABC, metaclass=PluginRegister):
 
     @property
     def mediaInfo(self):
-        return self._get_full_mediainfo()
+        return get_full_mediainfo(self._mediainfo)
 
     @property
     def mediaInfos(self):
@@ -571,7 +451,18 @@ class Base(ABC, metaclass=PluginRegister):
                 if track.encoded_library_name:
                     return track.encoded_library_name
                 if track.commercial_name == "AVC":
-                    return "x264"
+                    return "h264"
+                if track.commercial_name == 'HEVC':
+                    return "hevc"
+        #  h264: "AVC/H.264",
+        #  hevc: "HEVC",
+        #  x264: "x264",
+        #  x265: "x265",
+        #  h265: "HEVC",
+        #  mpeg2: "MPEG-2",
+        #  mpeg4: "AVC/H.264",
+        #  vc1: "VC-1",
+        #  dvd: "MPEG"
         return ""
 
     @property

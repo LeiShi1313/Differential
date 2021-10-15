@@ -3,7 +3,7 @@ import re
 from loguru import logger
 
 from differential.version import version
-from differential.utils import merge_config
+from differential.utils.config import merge_config
 from differential.plugins.base import PARSER, REGISTERED_PLUGINS
 
 

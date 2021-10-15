@@ -6,9 +6,9 @@ from urllib.parse import quote
 
 from loguru import logger
 
-from differential.utils import open_link
 from differential.plugins.base import Base
-from differential.utils import get_track_attr
+from differential.utils.browser import open_link
+from differential.utils.mediainfo import get_track_attr
 
 
 class NexusPHP(Base):
@@ -92,7 +92,6 @@ class NexusPHP(Base):
             return "\n".join(m.groups())
         return ""
 
-
     def upload(self):
         self._prepare()
         if self.easy_upload:
@@ -102,7 +101,7 @@ class NexusPHP(Base):
                 torrent_info["description"] = ""
             logger.trace(f"torrent_info: {torrent_info}")
             link = f"{self.upload_url}#torrentInfo={quote(json.dumps(torrent_info))}"
-            logger.debug(f"已生成自动上传链接：{link}")
+            logger.trace(f"已生成自动上传链接：{link}")
             if self.trim_description:
                 logger.info(f"种子描述：\n{self.description}")
             open_link(link)
