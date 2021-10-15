@@ -26,4 +26,14 @@ ptpimg_api_key = XXXXXXXXXXXXX
 
 [LemonHD]
 
+[LeagueOfficial]
+screenshot_count = 10
+image_hosting = CHEVERETO
+chevereto_hosting_url = https://imgbox.xxxxxxx.com
+chevereto_cookie = PHPSESSID=xxxxxxx; KEEP_LOGIN=xxxxxxxxxxxxxxxxxx
+chevereto_auth_token = xxxxxxxxxxxxxxxxxxxxxx
+upload_type tv
+team = LeagueTV
+source_name = HDTV
+
 [CHDBits]
