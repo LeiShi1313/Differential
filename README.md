@@ -73,7 +73,7 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 
 ## 其他插件
 
-为保护站点信息，请到`plugins`文件夹查看或者`dft [插件名称] -h`查看支持的参数
+为保护站点信息，请到[`plugins`](https://github.com/LeiShi1313/Differential/tree/main/differential/plugins)文件夹查看或者`dft [插件名称] -h`查看支持的参数
 
 
 # TODO
