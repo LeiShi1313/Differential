@@ -1,0 +1,39 @@
+[DEFAULT]
+generate_nfo = false
+make_torrent = false
+screenshot_count = 0
+optimize_screenshot = true
+image_hosting = PTPIMG
+ptpimg_api_key = XXXXXXXXXXXXX
+# image_hosting_url =
+# chevereto_api_key =
+# imgurl_api_key =
+# smms_api_key =
+# ptgen_url = https://api.douban.workers.dev
+# ptgen_retry = 3
+# announce_url =
+
+[NexusPHP]
+# 每个插件都可以重新定义各个参数，并且会覆盖默认参数
+# upload_url = http://127.0.0.1:8000/upload.php
+# generate_nfo = true
+# make_torrent = true
+# encoder_log =
+# easy_upload = true
+# trim_description = false
+
+[PTerClub]
+
+[LemonHD]
+
+[LeagueOfficial]
+screenshot_count = 10
+image_hosting = CHEVERETO
+chevereto_hosting_url = https://imgbox.xxxxxxx.com
+chevereto_cookie = PHPSESSID=xxxxxxx; KEEP_LOGIN=xxxxxxxxxxxxxxxxxx
+chevereto_auth_token = xxxxxxxxxxxxxxxxxxxxxx
+upload_type tv
+team = LeagueTV
+source_name = HDTV
+
+[CHDBits]
