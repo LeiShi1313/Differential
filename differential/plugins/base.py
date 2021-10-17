@@ -335,7 +335,7 @@ class Base(ABC, metaclass=PluginRegister):
     def subtitle(self):
         if not self._ptgen.get("site") == "douban":
             return ""
-        subtitle = f"{'/'.join(self._ptgen.get('this_title', []) + self._ptgen.get('aka', []))}"
+        subtitle = f"{'/'.join(self._ptgen.get('chinese_title', []) + self._ptgen.get('aka', []))}"
         if self._ptgen.get("director"):
             subtitle += (
                 f"【导演：{'/'.join([d.get('name') for d in self._ptgen.get('director')])}】"
