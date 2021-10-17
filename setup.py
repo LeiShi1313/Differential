@@ -3,9 +3,9 @@ from setuptools import setup, find_packages
 
 setup(
     name="Differential",
-    packages=find_packages(include=["differential", "differential.*"]),
+    packages=find_packages(),
     long_description=open("README.md", "r", encoding='utf-8').read(),
-    long_description_content_type="text/markdown",
+    # long_description_content_type="text/markdown",
     description="a Python script for easy uploading torrents to varies PT sites.",
     author="Lei Shi",
     author_email="me@leishi.io",
