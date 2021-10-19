@@ -74,11 +74,11 @@ class LeagueOfficial(LemonHD):
             media_info += f"Scan Type............: {get_track_attr(track, 'scan type', True)}\n"
             media_info += f"Bite Depth...........: {get_track_attr(track, 'bit depth', True)}\n"
 
-        for track in self._mediainfo.audio_tracks:
-            media_info += f"Audio #{get_track_attr(track, 'stream_identifier', True)}.............: {get_track_attrs(track, ['bit rate', 'bit rate mode','channel_s', 'format'])}\n"
+        for idx, track in enumerate(self._mediainfo.audio_tracks):
+            media_info += f"Audio #{idx}.............: {get_track_attrs(track, ['bit rate', 'bit rate mode','channel_s', 'format'])}\n"
 
-        for track in self._mediainfo.text_tracks:
-            media_info += f"Subtitle #{get_track_attr(track, 'stream_identifier', True)}..........: {get_track_attrs(track, ['format', 'title', 'language'])}\n"
+        for idx, track in enumerate(self._mediainfo.text_tracks):
+            media_info += f"Subtitle #{idx}..........: {get_track_attrs(track, ['format', 'title', 'language'])}\n"
 
         if self.source_name:
             media_info += f"Source...............: {self.source_name}\n"
@@ -92,7 +92,7 @@ class LeagueOfficial(LemonHD):
             "{}\n\n"
             "[img]https://imgbox.leaguehd.com/images/2021/01/04/info_01.png[/img]\n"
             "[quote][size=3][color=Navy][b]★★★ ★★ General Information ★★★ ★★ [/color][/size][/b]\n"
-            "{}[/quote]\n\n"
+            "[font=Courier New]{}[/font][/quote]\n\n"
             "[img]https://imgbox.leaguehd.com/images/2021/01/04/screens_01.png[/img]\n"
             "{}\n".format(
                 GROUP_QUOTES.get(self.team, ''),
