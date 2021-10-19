@@ -51,7 +51,7 @@ def chevereto_cookie_upload(img: Path, url: str, cookie: str, auth_token: str) -
     if 'error' in res:
         logger.warning(f"上传图片失败: [{res['error'].get('code')}] {res['error'].get('context')} {res['error'].get('message')}")
         return None
-    if res.get('status_code') != 200:
+    if 'status_code' in res and res.get('status_code') != 200:
         logger.warning(f"上传图片失败: [{res['status_code']}] {res.get('status_txt')}")
         return None 
     if 'image' not in res or 'url' not in res['image']:
