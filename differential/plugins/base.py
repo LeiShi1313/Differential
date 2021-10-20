@@ -22,7 +22,7 @@ from differential.utils.torrent import make_torrent
 from differential.utils.binary import ffprobe, execute
 from differential.utils.mediainfo import get_track_attr
 from differential.utils.mediainfo import get_full_mediainfo
-from differential.utils.image import ptpimg_upload, smms_upload, imgurl_upload, chevereto_api_upload, chevereto_cookie_upload
+from differential.utils.image import ptpimg_upload, smms_upload, imgurl_upload, chevereto_api_upload, chevereto_username_upload
 
 
 PARSER = argparse.ArgumentParser(description="Differential - 差速器 PT快速上传工具")
@@ -84,8 +84,8 @@ class Base(ABC, metaclass=PluginRegister):
         parser.add_argument('--chevereto-hosting-url', type=str, help="自建chevereto图床的地址", default=argparse.SUPPRESS)
         parser.add_argument('--ptpimg-api-key', type=str, help="PTPIMG的API Key", default=argparse.SUPPRESS)
         parser.add_argument('--chevereto-api-key', type=str, help="自建Chevereto的API Key，详情见https://v3-docs.chevereto.com/api/#api-call", default=argparse.SUPPRESS)
-        parser.add_argument('--chevereto-cookie', type=str, help="如果自建Chevereto的API未开放，请设置auth token和cookie", default=argparse.SUPPRESS)
-        parser.add_argument('--chevereto-auth-token', type=str, help="如果自建Chevereto的API未开放，请设置auth token和cookie", default=argparse.SUPPRESS)
+        parser.add_argument('--chevereto-username', type=str, help="如果自建Chevereto的API未开放，请设置username和password", default=argparse.SUPPRESS)
+        parser.add_argument('--chevereto-password', type=str, help="如果自建Chevereto的API未开放，请设置username和password", default=argparse.SUPPRESS)
         parser.add_argument('--imgurl-api-key', type=str, help="Imgurl的API Key", default=argparse.SUPPRESS)
         parser.add_argument('--smms-api-key', type=str, help="SM.MS的API Key", default=argparse.SUPPRESS)
         parser.add_argument('--ptgen-url', type=str, help="自定义PTGEN的地址", default=argparse.SUPPRESS)
@@ -104,8 +104,8 @@ class Base(ABC, metaclass=PluginRegister):
         imgurl_hosting_url: str = '',
         ptpimg_api_key: str = None,
         chevereto_api_key: str = None,
-        chevereto_cookie: str = None,
-        chevereto_auth_token: str = None,
+        chevereto_username: str = None,
+        chevereto_password: str = None,
         imgurl_api_key: str = None,
         smms_api_key: str = None,
         ptgen_url: str = "https://ptgen.lgto.workers.dev",
@@ -123,8 +123,8 @@ class Base(ABC, metaclass=PluginRegister):
         self.chevereto_hosting_url = chevereto_hosting_url
         self.imgurl_hosting_url = imgurl_hosting_url
         self.ptpimg_api_key = ptpimg_api_key
-        self.chevereto_cookie = chevereto_cookie
-        self.chevereto_auth_token = chevereto_auth_token
+        self.chevereto_username = chevereto_username
+        self.chevereto_password = chevereto_password
         self.chevereto_api_key = chevereto_api_key
         self.imgurl_api_key = imgurl_api_key
         self.smms_api_key = smms_api_key
@@ -144,7 +144,7 @@ class Base(ABC, metaclass=PluginRegister):
     def upload_screenshots(self, img_dir: str) -> list:
         img_urls = []
         for count, img in enumerate(sorted(Path(img_dir).glob("*.png"))):
-            if img.is_file() and img.name.lower().endswith('png'):
+            if img.is_file():
                 img_url = None
                 img_url_file = img.resolve().parent.joinpath(".{}.{}".format(self.image_hosting.value, img.stem))
                 if img_url_file.is_file():
@@ -160,10 +160,10 @@ class Base(ABC, metaclass=PluginRegister):
                             sys.exit(1)
                         if self.chevereto_api_key:
                             img_url = chevereto_api_upload(img, self.chevereto_hosting_url, self.chevereto_api_key)
-                        elif self.chevereto_cookie and self.chevereto_auth_token:
-                            img_url = chevereto_cookie_upload(img, self.chevereto_hosting_url, self.chevereto_cookie, self.chevereto_auth_token)
+                        elif self.chevereto_username and self.chevereto_password:
+                            img_url = chevereto_username_upload(img, self.chevereto_hosting_url, self.chevereto_username, self.chevereto_password)
                         else:
-                            logger.error("Chevereto的API Key/Cookie均未设置，请检查chevereto-api-key/chevereto-cookie+chevereto-auth-token设置")
+                            logger.error("Chevereto的API或用户名或密码未设置，请检查chevereto-username/chevereto-password设置")
                     elif self.image_hosting == ImageHosting.IMGURL:
                         img_url = imgurl_upload(img, self.imgurl_hosting_url, self.imgurl_api_key)
                     elif self.image_hosting == ImageHosting.SMMS:
