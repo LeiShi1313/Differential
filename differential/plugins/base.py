@@ -153,7 +153,7 @@ class Base(ABC, metaclass=PluginRegister):
                         logger.info(f"发现已上传的第{count + 1}张截图链接：{img_url}")
                 else:
                     if self.image_hosting == ImageHosting.PTPIMG:
-                        img_url = ptpimg_api_upload(img, self.ptpimg_api_key)
+                        img_url = ptpimg_upload(img, self.ptpimg_api_key)
                     elif self.image_hosting == ImageHosting.CHEVERETO:
                         if not self.chevereto_hosting_url:
                             logger.error("Chevereto地址未提供，请设置chevereto_hosting_url")
