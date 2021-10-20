@@ -9,7 +9,7 @@ def merge_config(args: argparse.Namespace) -> dict:
     config = None
     if hasattr(args, 'config'):
         config = RawConfigParser()
-        config.read(args.config)
+        config.read(args.config, encoding='utf-8')
 
     if config:
         # First use the args in the general section
