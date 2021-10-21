@@ -22,7 +22,7 @@ from differential.utils.torrent import make_torrent
 from differential.utils.binary import ffprobe, execute
 from differential.utils.mediainfo import get_track_attr
 from differential.utils.mediainfo import get_full_mediainfo
-from differential.utils.image import ptpimg_upload, smms_upload, imgurl_upload, chevereto_api_upload, chevereto_username_upload
+from differential.utils.image import byr_upload, ptpimg_upload, smms_upload, imgurl_upload, chevereto_api_upload, chevereto_username_upload
 
 
 PARSER = argparse.ArgumentParser(description="Differential - 差速器 PT快速上传工具")
@@ -88,6 +88,8 @@ class Base(ABC, metaclass=PluginRegister):
         parser.add_argument('--chevereto-password', type=str, help="如果自建Chevereto的API未开放，请设置username和password", default=argparse.SUPPRESS)
         parser.add_argument('--imgurl-api-key', type=str, help="Imgurl的API Key", default=argparse.SUPPRESS)
         parser.add_argument('--smms-api-key', type=str, help="SM.MS的API Key", default=argparse.SUPPRESS)
+        parser.add_argument('--byr-authorization', type=str, help="BYR的Authorization头，可登录后访问任意页面F12查看，形如Basic bGVpxxxxxxxxxxx2whQA==", default=argparse.SUPPRESS)
+        parser.add_argument('--byr-alternative-url', type=str, help="BYR反代地址(如有)，可为空", default=argparse.SUPPRESS)
         parser.add_argument('--ptgen-url', type=str, help="自定义PTGEN的地址", default=argparse.SUPPRESS)
         parser.add_argument('--ptgen-retry', type=int, help="PTGEN重试次数，默认为3次", default=argparse.SUPPRESS)
         parser.add_argument('--announce-url', type=str, help="制种时announce地址", default=argparse.SUPPRESS)
@@ -108,6 +110,8 @@ class Base(ABC, metaclass=PluginRegister):
         chevereto_password: str = None,
         imgurl_api_key: str = None,
         smms_api_key: str = None,
+        byr_authorization: str = None,
+        byr_alternative_url: str = None,
         ptgen_url: str = "https://ptgen.lgto.workers.dev",
         announce_url: str = 'https://example.com',
         ptgen_retry: int = 3,
@@ -128,6 +132,8 @@ class Base(ABC, metaclass=PluginRegister):
         self.chevereto_api_key = chevereto_api_key
         self.imgurl_api_key = imgurl_api_key
         self.smms_api_key = smms_api_key
+        self.byr_authorization = byr_authorization
+        self.byr_alternative_url = byr_alternative_url
         self.ptgen_url = ptgen_url
         self.announce_url = announce_url
         self.ptgen_retry = ptgen_retry
@@ -168,6 +174,8 @@ class Base(ABC, metaclass=PluginRegister):
                         img_url = imgurl_upload(img, self.imgurl_hosting_url, self.imgurl_api_key)
                     elif self.image_hosting == ImageHosting.SMMS:
                         img_url = smms_upload(img, self.smms_api_key)
+                    elif self.image_hosting == ImageHosting.BYR:
+                        img_url = byr_upload(img, self.byr_authorization, self.byr_alternative_url)
 
                 if img_url:
                     logger.info(f"第{count + 1}张截图地址：{img_url}")

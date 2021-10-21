@@ -12,6 +12,7 @@ class ImageHosting(Enum):
     IMGURL = 'imgurl'
     CHEVERETO = 'chevereto'
     SMMS = 'smms'
+    BYR = 'byr'
 
     @staticmethod
     def parse(s: str):
@@ -25,4 +26,6 @@ class ImageHosting(Enum):
             return ImageHosting.CHEVERETO
         elif s.lower() == 'smms':
             return ImageHosting.SMMS
+        elif s.lower() == 'byr':
+            return ImageHosting.BYR
         raise ValueError(f"不支持的图床：{s}")
