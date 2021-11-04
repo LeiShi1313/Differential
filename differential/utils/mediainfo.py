@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import shutil
 import platform
@@ -6,12 +7,14 @@ import argparse
 import subprocess
 import webbrowser
 from pathlib import Path
+from decimal import Decimal
 from typing import Optional, List
 from configparser import ConfigParser
 
 from loguru import logger
 from pymediainfo import Track, MediaInfo
 
+from differential.utils.binary import ffprobe
 from differential.constants import ImageHosting, BOOLEAN_STATES, BOOLEAN_ARGS
 
 
@@ -171,3 +174,46 @@ def get_full_mediainfo(mediainfo: MediaInfo) -> str:
         media_info += "\n"
     media_info.strip()
     return media_info
+
+def get_duration(media_info: MediaInfo) -> Optional[Decimal]:
+    for track in media_info.tracks:
+        if track.track_type == "Video":
+            return Decimal(track.duration)
+    logger.error(f"未找到视频Track，请检查{main_file}是否为支持的文件")
+    return None
+
+def get_resolution(main_file: Path, media_info: MediaInfo) -> Optional[str]:
+    # 利用ffprobe获取视频基本信息
+    ffprobe_out = ffprobe(main_file)
+    m = re.search(r"Stream.*?Video.*?(\d{2,5})x(\d{2,5})", ffprobe_out)
+    if not m:
+        logger.debug(ffprobe_out)
+        logger.warning(f"无法获取到视频的分辨率")
+        return None
+
+    # 获取视频分辨率以及长度等信息
+    width, height = int(m.group(1)), int(m.group(2))
+    for track in media_info.tracks:
+        if track.track_type == "Video":
+            pixel_aspect_ratio = Decimal(track.pixel_aspect_ratio)
+            break
+    else:
+        logger.error(f"未找到视频Track，请检查{main_file}是否为支持的文件")
+        return None
+
+    resolution = None
+    if pixel_aspect_ratio <= 1:
+        pheight = int(height * pixel_aspect_ratio) + (
+            int(height * pixel_aspect_ratio) % 2
+        )
+        resolution = f"{width}x{pheight}"
+    else:
+        pwidth = int(width * pixel_aspect_ratio) + (
+            int(width * pixel_aspect_ratio) % 2
+        )
+        resolution = f"{pwidth}x{height}"
+    logger.trace(
+        f"width: {width} height: {height}, "
+        f"PAR: {pixel_aspect_ratio}, resolution: {resolution}"
+    )
+    return resolution

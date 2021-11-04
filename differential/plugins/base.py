@@ -20,8 +20,7 @@ from differential.version import version
 from differential.constants import ImageHosting
 from differential.utils.torrent import make_torrent
 from differential.utils.binary import ffprobe, execute
-from differential.utils.mediainfo import get_track_attr
-from differential.utils.mediainfo import get_full_mediainfo
+from differential.utils.mediainfo import get_track_attr, get_full_mediainfo, get_resolution, get_duration
 from differential.utils.image import byr_upload, ptpimg_upload, smms_upload, imgurl_upload, chevereto_api_upload, chevereto_username_upload
 
 
@@ -146,7 +145,6 @@ class Base(ABC, metaclass=PluginRegister):
         self._mediainfo: Optional[MediaInfo] = None
         self._screenshots: list = []
 
-
     def upload_screenshots(self, img_dir: str) -> list:
         img_urls = []
         for count, img in enumerate(sorted(Path(img_dir).glob("*.png"))):
@@ -247,45 +245,11 @@ class Base(ABC, metaclass=PluginRegister):
             with open(self.folder.joinpath(f"{self.folder.name}.nfo"), 'wb') as f:
                 f.write(self.mediaInfo.encode())
 
-    def _get_screenshots(self) -> list:
-        if self._main_file is None:
-            logger.error("未找到可以被截图的资源，请确认目标目录含有支持的资源!")
-            return []
-
-        # 利用ffprobe获取视频基本信息
-        ffprobe_out = ffprobe(self._main_file)
-        m = re.search(r"Stream.*?Video.*?(\d{2,5})x(\d{2,5})", ffprobe_out)
-        if not m:
-            logger.debug(ffprobe_out)
-            logger.warning(f"无法获取到视频的分辨率")
-            return []
-
-        # 获取视频分辨率以及长度等信息
-        width, height = int(m.group(1)), int(m.group(2))
-        for track in self._mediainfo.tracks:
-            if track.track_type == "Video":
-                duration = Decimal(track.duration)
-                pixel_aspect_ratio = Decimal(track.pixel_aspect_ratio)
-                break
-        else:
-            logger.error(f"未找到视频Track，请检查{self._main_file}是否为支持的文件")
-            return []
-
-        if pixel_aspect_ratio <= 1:
-            pheight = int(height * pixel_aspect_ratio) + (
-                int(height * pixel_aspect_ratio) % 2
-            )
-            resolution = f"{width}x{pheight}"
-        else:
-            pwidth = int(width * pixel_aspect_ratio) + (
-                int(width * pixel_aspect_ratio) % 2
-            )
-            resolution = f"{pwidth}x{height}"
-        logger.trace(
-            f"duration: {duration}, "
-            f"width: {width} height: {height}, "
-            f"PAR: {pixel_aspect_ratio}, resolution: {resolution}"
-        )
+    def _make_screenshots(self) -> Optional[str]:
+        resolution = get_resolution(self._main_file, self._mediainfo)
+        duration = get_duration(self._mediainfo)
+        if resolution is None or duration is None:
+            return None
 
         temp_dir = None
         # 查找已有的截图
@@ -308,6 +272,16 @@ class Base(ABC, metaclass=PluginRegister):
                 if self.optimize_screenshot:
                     image = Image.open(screenshot_path)
                     image.save(f"{screenshot_path}", format="PNG", optimized=True)
+        return temp_dir
+
+    def _get_screenshots(self) -> list:
+        if self._main_file is None:
+            logger.error("未找到可以被截图的资源，请确认目标目录含有支持的资源!")
+            return []
+
+        temp_dir = self._make_screenshots()
+        if temp_dir is None:
+            return []
 
         # 上传截图
         screenshots = self.upload_screenshots(temp_dir)

@@ -1,5 +1,11 @@
 import string
 import argparse
+import tempfile
+from pathlib import Path
+from typing import Optional
+
+from PIL import Image
+from loguru import logger
 
 from differential.plugins.lemonhd import LemonHD
 from differential.utils.mediainfo import get_track_attr, get_track_attrs
@@ -41,13 +47,37 @@ class LeagueOfficial(LemonHD):
         parser.add_argument('--source-name', type=str, help='资源来源，HDTV/WEB-DL等', default=argparse.SUPPRESS)
         parser.add_argument('--uploader', type=str, help="发布者者名字，默认Anonymous", default=argparse.SUPPRESS)
         parser.add_argument('--team', type=str, help="官组名，LeagueTV/LeagueWeb/LeagueNF等等", default=argparse.SUPPRESS)
+        parser.add_argument('--combine-screenshots', type=bool, help='是否合并所有截图为一张图，默认开启', default=argparse.SUPPRESS)
         return parser
 
-    def __init__(self, folder: str, url: str, source_name: str, team: str, uploader: str = "Anonymous", **kwargs):
+    def __init__(self, folder: str, url: str, source_name: str, team: str, uploader: str = "Anonymous", combine_screenshots: bool = True, **kwargs):
         super().__init__(folder, url, **kwargs)
         self.team = team
         self.uploader = uploader
         self.source_name = source_name
+        self.combine_screenshots = combine_screenshots
+
+    def _make_screenshots(self) -> Optional[str]:
+        screenshots_dir = super()._make_screenshots()
+        if not self.combine_screenshots:
+            return screenshots_dir
+
+        images = [Image.open(i) for i in sorted(Path(screenshots_dir).glob("*.png"))]
+
+        width, height = images[0].size
+        new_width = 2 * width
+        new_height = (self.screenshot_count // 2 + self.screenshot_count % 2) * height
+
+        new_im = Image.new('RGBA', (new_width, new_height))
+        for idx, im in enumerate(images):
+            x = (idx % 2) * width
+            y = (idx // 2) * height
+            new_im.paste(im, (x, y))
+
+        temp_dir = tempfile.mkdtemp()
+        screenshot_path = f'{temp_dir}/{self._main_file.stem}.thumb.png'
+        new_im.save(screenshot_path, format='png')
+        return temp_dir
 
     @property
     def subtitle(self):
