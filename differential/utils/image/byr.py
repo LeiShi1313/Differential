@@ -5,6 +5,7 @@ from typing import Optional
 import requests
 from loguru import logger
 
+
 def byr_upload(img: Path, authorization: str, url: Optional[str] = None) -> Optional[str]:
     headers = {'authorization': f'{authorization if authorization.startswith("Basic") else "Basic "+authorization}'}
     params = {'command': 'QuickUpload', 'type': 'Images', 'CKEditor': 'descr', 'CKEditorFuncNum': 2}

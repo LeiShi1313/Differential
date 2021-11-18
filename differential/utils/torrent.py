@@ -10,6 +10,7 @@ from differential.version import version
 def make_torrent_progress(torrent, filepath, pieces_done, pieces_total):
     logger.info(f'制种进度: {pieces_done/pieces_total*100:3.0f} %')
 
+
 def make_torrent(path: Path, trackers: List[str]):
     logger.info("正在生成种子...")
     t = Torrent(path=path, trackers=trackers,

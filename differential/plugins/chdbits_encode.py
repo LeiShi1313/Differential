@@ -204,7 +204,7 @@ class CHDBitsEncode(CHDBits):
                 f.write(self.media_info.encode())
 
     @property
-    def torrent_info(self):
-        torrent_info = super().torrent_info
+    def easy_upload_torrent_info(self):
+        torrent_info = super().easy_upload_torrent_info
         torrent_info["team"] = self.team.lower()
         return torrent_info
