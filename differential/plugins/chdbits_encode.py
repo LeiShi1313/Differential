@@ -124,14 +124,14 @@ class CHDBitsEncode(CHDBits):
         for idx, track in enumerate(self._mediainfo.audio_tracks):
             if track.other_language and len(track.other_language) > 1:
                 media_info += (
-                    f"AUDiO...........: {'#'+str(idx+1) if len(self._mediainfo.audio_tracks) > 1 else ''}"
+                    f"AUDiO...........: {'#'+str(idx+1) if len(self._mediainfo.audio_tracks) > 1 else ''} "
                     f"{track.other_language[0]} "
                     f"{track.commercial_name} {track.other_channel_s[0]} "
                     f"@ {track.other_bit_rate[0]}\n"
                 )
             else:
                 media_info += (
-                    f"AUDiO...........: {'#'+str(idx+1) if len(self._mediainfo.audio_tracks) > 1 else ''}"
+                    f"AUDiO...........: {'#'+str(idx+1) if len(self._mediainfo.audio_tracks) > 1 else ''} "
                     f"{track.commercial_name} {track.other_channel_s[0]} "
                     f"@ {track.other_bit_rate[0]}\n"
                 )

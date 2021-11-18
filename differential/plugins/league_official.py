@@ -62,6 +62,7 @@ class LeagueOfficial(LemonHD):
         if not self.combine_screenshots:
             return screenshots_dir
 
+        logger.info("正在合并图片...")
         images = [Image.open(i) for i in sorted(Path(screenshots_dir).glob("*.png"))]
 
         width, height = images[0].size

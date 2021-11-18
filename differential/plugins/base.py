@@ -459,6 +459,7 @@ class Base(ABC, metaclass=PluginRegister):
             "DTS-HD Master Audio": "dtshdma",
             "Dolby Digital Plus with Dolby Atmos": "atmos",
             "Dolby TrueHD": "truehd",
+            "Dolby TrueHD with Dolby Atmos": "truehd",
         }
         for track in self._mediainfo.tracks:
             if track.track_type == "Audio":
