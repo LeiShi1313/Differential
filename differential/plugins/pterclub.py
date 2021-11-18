@@ -17,5 +17,5 @@ class PTerClub(NexusPHP):
     def add_parser(cls, parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         return super().add_parser(parser)
 
-    def __init__(self, folder: str, url: str, **kwargs):
-        super().__init__(folder, url, upload_url="https://pterclub.com/upload.php", **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(upload_url="https://pterclub.com/upload.php", **kwargs)

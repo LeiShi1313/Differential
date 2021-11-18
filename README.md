@@ -38,7 +38,7 @@ pip install Differential
 
 # 如何使用差速器
 
-差速器支持未经过重大修改的NexusPHP站点以及部分支持[easy-upload](https://github.com/techmovie/easy-upload)支持的站点。
+差速器支持未经过重大修改的NexusPHP/Gazelle/Unit3D站点以及部分支持[easy-upload](https://github.com/techmovie/easy-upload)和[auto_feed_js](https://github.com/tomorrow505/auto_feed_js)支持的站点。
 在使用前，请先使用`dft -h`查看本工具支持的站点/现有的插件。
 
 请先参考`config.ini.example`，在`Default`块填上各个站点/插件通用的参数，比如图床相关的几个参数，然后在各站点/插件名字对应的块填上各自特有的参数，比如截图张数等等。
@@ -54,6 +54,7 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 - `log`: log文件的路径
 - `folder`: 种子文件或文件夹的路径
 - `url`: 影片的豆瓣链接，事实上，所有PTGen支持的链接这里都支持
+- `upload_url`: 发种页面的地址
 - `make_torrent`: 是否制种，默认关闭
 - `geenrate_nfo`: 是否利用mediainfo生成nfo文件，默认关闭
 - `screenshot_count`: 截图生成的张数，默认为0，即不生成截图
@@ -61,14 +62,9 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 - `image_hosting_url`: 如果是自建的图床，提供图床链接
 - `ptgen_url`: PTGen的地址，默认是我自建的PTGen，可能会不稳定
 - `announce_url`: 制种时的announce地址
-
-## NexusPHP
-
-相比基础参数，`NexusPHP`插件特有的参数有：
-
-- `upload_url`: 发种页面的地址
 - `encoder_log`: 压制log的地址，如果提供的话会在介绍的mediainfo部分附上压制log
-- `easy_upload`: 默认开启，关闭的话会直接在命令行输出主/副标题，描述和mediainfo
+- `easy_upload`: 默认关闭，开启的话会利用[easy-upload](https://github.com/techmovie/easy-upload)自动填充发种页面表单
+- `auto_feed`: 默认关闭，开启的话会利用[auto_feed_js](https://github.com/tomorrow505/auto_feed_js)自动填充发种页面表单
 - `trim_description`: 默认关闭，开启的话会省略掉上传链接的描述部分，以避免链接过长浏览器无法打开的问题
 
 ## 其他插件

@@ -50,8 +50,8 @@ class LeagueOfficial(LemonHD):
         parser.add_argument('--combine-screenshots', type=bool, help='是否合并所有截图为一张图，默认开启', default=argparse.SUPPRESS)
         return parser
 
-    def __init__(self, folder: str, url: str, source_name: str, team: str, uploader: str = "Anonymous", combine_screenshots: bool = True, **kwargs):
-        super().__init__(folder, url, **kwargs)
+    def __init__(self, source_name: str, team: str, uploader: str = "Anonymous", combine_screenshots: bool = True, **kwargs):
+        super().__init__(**kwargs)
         self.team = team
         self.uploader = uploader
         self.source_name = source_name
@@ -90,7 +90,7 @@ class LeagueOfficial(LemonHD):
         return subtitle
 
     @property
-    def mediaInfo(self):
+    def media_info(self):
         media_info = ""
         for track in self._mediainfo.general_tracks:
             media_info += f"File Name............: {track.file_name}\n"
@@ -128,7 +128,7 @@ class LeagueOfficial(LemonHD):
             "{}\n".format(
                 GROUP_QUOTES.get(self.team, ''),
                 self._ptgen.get("format"),
-                self.mediaInfo,
+                self.media_info,
                 "\n".join([f"[img]{url}[/img]" for url in self._screenshots]),
             )
         )

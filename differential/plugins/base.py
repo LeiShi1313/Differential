@@ -8,6 +8,7 @@ import argparse
 from pathlib import Path
 from decimal import Decimal
 from typing import Optional
+from urllib.parse import quote
 from abc import ABC, ABCMeta, abstractmethod
 
 import requests
@@ -16,10 +17,15 @@ from torf import Torrent
 from loguru import logger
 from pymediainfo import MediaInfo
 
+from differential.torrent import TorrnetBase
 from differential.version import version
 from differential.constants import ImageHosting
+from differential.utils.browser import open_link
+from differential.utils.mediainfo import get_track_attr
 from differential.utils.torrent import make_torrent
+from differential.utils.parse import parse_encoder_log
 from differential.utils.binary import ffprobe, execute
+from differential.utils.uploader import EasyUpload, AutoFeed
 from differential.utils.mediainfo import get_track_attr, get_full_mediainfo, get_resolution, get_duration
 from differential.utils.image import byr_upload, ptpimg_upload, smms_upload, imgurl_upload, chevereto_api_upload, chevereto_username_upload
 
@@ -62,7 +68,7 @@ class PluginRegister(ABCMeta):
         raise NotImplementedError()
 
 
-class Base(ABC, metaclass=PluginRegister):
+class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @classmethod
     @abstractmethod
@@ -71,6 +77,7 @@ class Base(ABC, metaclass=PluginRegister):
         parser.add_argument('-l', '--log', type=str, help='log文件的路径', default=argparse.SUPPRESS)
         parser.add_argument('-f', '--folder', type=str, help='种子文件夹的路径', default=argparse.SUPPRESS)
         parser.add_argument('-u', '--url', type=str, help='豆瓣链接', default=argparse.SUPPRESS)
+        parser.add_argument("-uu",'--upload-url', type=str, help="PT站点上传的路径，一般为https://xxxxx.com/upload.php", default=argparse.SUPPRESS)
         parser.add_argument('-t', '--make-torrent', action="store_true", help="是否制种，默认否", default=argparse.SUPPRESS)
         parser.add_argument('-n', '--generate-nfo', action="store_true", help="是否用MediaInfo生成NFO文件，默认否",
                             default=argparse.SUPPRESS)
@@ -87,17 +94,24 @@ class Base(ABC, metaclass=PluginRegister):
         parser.add_argument('--chevereto-password', type=str, help="如果自建Chevereto的API未开放，请设置username和password", default=argparse.SUPPRESS)
         parser.add_argument('--imgurl-api-key', type=str, help="Imgurl的API Key", default=argparse.SUPPRESS)
         parser.add_argument('--smms-api-key', type=str, help="SM.MS的API Key", default=argparse.SUPPRESS)
-        parser.add_argument('--byr-authorization', type=str, help="BYR的Authorization头，可登录后访问任意页面F12查看，形如Basic bGVpxxxxxxxxxxx2whQA==", default=argparse.SUPPRESS)
+        parser.add_argument('--byr-authorization', type=str, help="BYR的Authorization头，可登录后访问任意页面F12查看，形如Basic xxxxxxxxxxxxxxxx==", default=argparse.SUPPRESS)
         parser.add_argument('--byr-alternative-url', type=str, help="BYR反代地址(如有)，可为空", default=argparse.SUPPRESS)
         parser.add_argument('--ptgen-url', type=str, help="自定义PTGEN的地址", default=argparse.SUPPRESS)
         parser.add_argument('--ptgen-retry', type=int, help="PTGEN重试次数，默认为3次", default=argparse.SUPPRESS)
         parser.add_argument('--announce-url', type=str, help="制种时announce地址", default=argparse.SUPPRESS)
+
+        parser.add_argument("--encoder-log", type=str, help="压制log的路径", default=argparse.SUPPRESS)
+        upload_option_group = parser.add_mutually_exclusive_group()
+        upload_option_group.add_argument("--easy-upload", action="store_true", help="使用树大Easy Upload插件自动填充", dest="easy_upload", default=argparse.SUPPRESS)
+        upload_option_group.add_argument("--auto-feed", action="store_true", help="使用明日大Auto Feed插件自动填充", dest="auto_feed",default=argparse.SUPPRESS)
+        parser.add_argument("--trim-description", action="store_true", help="是否在生成的链接中省略种子描述，该选项主要是为了解决浏览器限制URL长度的问题，默认关闭", default=argparse.SUPPRESS)
         return parser
 
     def __init__(
         self,
         folder: str,
         url: str,
+        upload_url: str,
         screenshot_count: int = 0,
         optimize_screenshot: bool = True,
         image_hosting: ImageHosting = ImageHosting.PTPIMG,
@@ -116,10 +130,15 @@ class Base(ABC, metaclass=PluginRegister):
         ptgen_retry: int = 3,
         generate_nfo: bool = False,
         make_torrent: bool = False,
+        easy_upload: bool = False,
+        auto_feed: bool = False,
+        trim_description: bool = False,
+        encoder_log: str = "",
         **kwargs,
     ):
         self.folder = Path(folder)
         self.url = url
+        self.upload_url = upload_url
         self.screenshot_count = screenshot_count
         self.optimize_screenshot = optimize_screenshot
         self.image_hosting = image_hosting
@@ -138,6 +157,10 @@ class Base(ABC, metaclass=PluginRegister):
         self.ptgen_retry = ptgen_retry
         self.generate_nfo = generate_nfo
         self.make_torrent = make_torrent
+        self.easy_upload = easy_upload
+        self.auto_feed = auto_feed
+        self.trim_description = trim_description
+        self.encoder_log = encoder_log
 
         self._main_file: Optional[Path] = None
         self._ptgen: dict = {}
@@ -211,7 +234,7 @@ class Base(ABC, metaclass=PluginRegister):
         logger.info(f"获取PTGen成功 {req.json().get('chinese_title', '')}")
         return req.json()
 
-    def _get_mediainfo(self) -> MediaInfo:
+    def _find_mediainfo(self) -> MediaInfo:
         # Always find the biggest file in the folder
         logger.info(f"正在获取Mediainfo: {self.folder}")
         if self.folder.is_file():
@@ -240,10 +263,10 @@ class Base(ABC, metaclass=PluginRegister):
         logger.info("正在生成nfo文件...")
         if self.folder.is_file():
             with open(f"{self.folder.resolve().parent.joinpath(self.folder.stem)}.nfo", 'wb') as f:
-                f.write(self.mediaInfo.encode())
+                f.write(self.media_info.encode())
         elif self.folder.is_dir():
             with open(self.folder.joinpath(f"{self.folder.name}.nfo"), 'wb') as f:
-                f.write(self.mediaInfo.encode())
+                f.write(self.media_info.encode())
 
     def _make_screenshots(self) -> Optional[str]:
         resolution = get_resolution(self._main_file, self._mediainfo)
@@ -298,12 +321,16 @@ class Base(ABC, metaclass=PluginRegister):
         while self._ptgen.get('failed') and ptgen_retry > 0:
             self._ptgen = self._get_ptgen()
             ptgen_retry -= 1
-        self._mediainfo = self._get_mediainfo()
+        self._mediainfo = self._find_mediainfo()
         if self.generate_nfo:
             self._generate_nfo()
         self._screenshots = self._get_screenshots()
         if self.make_torrent:
             make_torrent(self.folder, [self.announce_url])
+
+    @property
+    def parsed_encoder_log(self):
+        return parse_encoder_log(self.encoder_log)
 
     @property
     def title(self):
@@ -336,38 +363,38 @@ class Base(ABC, metaclass=PluginRegister):
         return subtitle
 
     @property
-    def mediaInfo(self):
+    def media_info(self):
         return get_full_mediainfo(self._mediainfo)
 
     @property
-    def mediaInfos(self):
+    def media_infos(self):
         return []
 
     @property
     def description(self):
         return "{}\n\n[quote]{}{}[/quote]\n\n{}".format(
             self._ptgen.get("format"),
-            self.mediaInfo,
+            self.media_info,
             "\n\n" + self.parsed_encoder_log if self.parsed_encoder_log else "",
             "\n".join([f"[img]{url}[/img]" for url in self._screenshots]),
         )
 
     @property
-    def originalDescription(self):
+    def original_description(self):
         return ''
 
     @property
-    def doubanUrl(self):
+    def douban_url(self):
         if self._ptgen.get("site") == "douban":
             return f"https://movie.douban.com/subject/{self._ptgen.get('sid')}"
         return ""
 
     @property
-    def doubanInfo(self):
+    def douban_info(self):
         return ''
 
     @property
-    def imdbUrl(self):
+    def imdb_url(self):
         return self._ptgen.get("imdb_link", "")
 
     @property
@@ -399,7 +426,7 @@ class Base(ABC, metaclass=PluginRegister):
         return imdb_type
 
     @property
-    def videoType(self):
+    def video_type(self):
         if "webdl" in self.folder.name.lower() or "web-dl" in self.folder.name.lower():
             return "web"
         elif "remux" in self.folder.name.lower():
@@ -430,7 +457,7 @@ class Base(ABC, metaclass=PluginRegister):
         return ""
 
     @property
-    def videoCodec(self):
+    def video_codec(self):
         for track in self._mediainfo.tracks:
             if track.track_type == "Video":
                 if track.encoded_library_name:
@@ -451,7 +478,7 @@ class Base(ABC, metaclass=PluginRegister):
         return ""
 
     @property
-    def audioCodec(self):
+    def audio_codec(self):
         codec_map = {
             "AAC": "aac",
             "Dolby Digital Plus": "dd+",
@@ -509,12 +536,12 @@ class Base(ABC, metaclass=PluginRegister):
             "美国": "US",
             "日本": "JP",
             "韩国": "KR",
-            "印度": "IND",
-            "法国": "EU",
-            "意大利": "EU",
-            "德国": "EU",
-            "西班牙": "EU",
-            "葡萄牙": "EU",
+            "印度": "IN",
+            "法国": "FR",
+            "意大利": "IT",
+            "德国": "GE",
+            "西班牙": "ES",
+            "葡萄牙": "PT",
         }
         regions = self._ptgen.get("region", [])
         for area in area_map.keys():
@@ -523,7 +550,7 @@ class Base(ABC, metaclass=PluginRegister):
         return ""
 
     @property
-    def movieName(self):
+    def movie_name(self):
         if self._ptgen.get("site") == "imdb":
             return self._ptgen.get("name", "")
         if self._ptgen.get("site") == "douban":
@@ -531,7 +558,7 @@ class Base(ABC, metaclass=PluginRegister):
         return ""
 
     @property
-    def movieAkaName(self):
+    def movie_aka_name(self):
         return ""
 
     @property
@@ -554,46 +581,46 @@ class Base(ABC, metaclass=PluginRegister):
         return tags
 
     @property
-    def otherTags(self):
+    def other_tags(self):
         return []
 
     @property
     def comparisons(self):
         return []
 
+    # Auto feed
     @property
-    def torrentInfo(self):
-        return {
-            "title": self.title,
-            "subtitle": self.subtitle,
-            "description": self.description,
-            "originalDescription": self.originalDescription,
-            "doubanUrl": self.doubanUrl,
-            "doubanInfo": self.doubanInfo,
-            "imdbUrl": self.imdbUrl,
-            "mediaInfo": self.mediaInfo,
-            "mediaInfos": self.mediaInfos,
-            "screenshots": self.screenshots,
-            "poster": self.poster,
-            "year": self.year,
-            "category": self.category,
-            "videoType": self.videoType,
-            "format": self.format,
-            "source": self.source,
-            "videoCodec": self.videoCodec,
-            "audioCodec": self.audioCodec,
-            "resolution": self.resolution,
-            "area": self.area,
-            "movieAkaName": self.movieAkaName,
-            "movieName": self.movieName,
-            "size": self.size,
-            "tags": self.tags,
-            "otherTags": self.otherTags,
-            "comparisons": self.comparisons,
-            "isForbidden": False,
-            "sourceSiteType": "NexusPHP",
-        }
+    def uploader_auto_feed(self):
+        return AutoFeed(plugin=self)
 
-    @abstractmethod
     def upload(self):
-        raise NotImplementedError()
+        self._prepare()
+        if self.easy_upload:
+            easy_upload = EasyUpload(plugin=self)
+            torrent_info = easy_upload.torrent_info
+            if self.trim_description:
+                # 直接打印简介部分来绕过浏览器的链接长度限制
+                torrent_info["description"] = ""
+            logger.trace(f"torrent_info: {torrent_info}")
+            link = f"{self.upload_url}#torrentInfo={quote(json.dumps(torrent_info))}"
+            logger.trace(f"已生成自动上传链接：{link}")
+            if self.trim_description:
+                logger.info(f"种子描述：\n{self.description}")
+            open_link(link)
+        elif self.auto_feed:
+            auto_feed = AutoFeed(plugin=self)
+            link = f"{self.upload_url}{quote(auto_feed.info, safe='#:/=@')}"
+            if self.trim_description:
+                logger.info(f"种子描述：\n{self.description}")
+            logger.trace(f"已生成自动上传链接：{link}")
+            open_link(link)
+        else:
+            logger.info(
+                "\n"
+                f"标题: {self.title}\n"
+                f"副标题: {self.subtitle}\n"
+                f"豆瓣: {self.douban_url}\n"
+                f"IMDB: {self.imdb_url}\n"
+                f"视频编码: {self.video_codec} 音频编码: {self.audio_codec} 分辨率: {self.resolution}\n"
+                f"描述:\n{self.description}"
+            )

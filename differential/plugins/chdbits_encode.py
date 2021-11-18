@@ -65,14 +65,12 @@ class CHDBitsEncode(CHDBits):
 
     def __init__(
         self,
-        folder: str,
-        url: str,
         source_name: str,
         encoder: str = "Anonymous",
         team: str = "CHD",
         **kwargs,
     ):
-        super().__init__(folder, url, **kwargs)
+        super().__init__(**kwargs)
         self.team = team
         self.encoder = encoder
         self.source_name = source_name
@@ -87,7 +85,7 @@ class CHDBitsEncode(CHDBits):
             return f"{'/'.join(self._ptgen.get('aka', []))}"
 
     @property
-    def mediaInfo(self):
+    def media_info(self):
         media_info = f"{self._main_file.stem}\n"
         imdb_link = self._ptgen.get('imdb_link')
         if imdb_link:
@@ -172,7 +170,7 @@ class CHDBitsEncode(CHDBits):
             "否则产生的一切后果将由您自己承担！本站将不对本站的任何内容负任何法律责任！"
             "该下载内容仅做宽带测试使用，请在下载后24小时内删除。请购买正版！[/b][/color][/quote]".format(
                 self._ptgen.get("format"),
-                self.mediaInfo + "\n\n" + self.parsed_encoder_log,
+                self.media_info + "\n\n" + self.parsed_encoder_log,
                 "\n".join([f"[img]{url}[/img]" for url in self._screenshots]),
             )
         )
@@ -194,7 +192,7 @@ class CHDBitsEncode(CHDBits):
                     f.write(CHDPAD.encode())
                 else:
                     f.write(NOTEAM.encode())
-                f.write(self.mediaInfo.encode())
+                f.write(self.media_info.encode())
         elif p.is_dir():
             with open(p.joinpath(f"{p.name}.nfo"), "wb") as f:
                 if self.team == "CHD":
@@ -203,10 +201,10 @@ class CHDBitsEncode(CHDBits):
                     f.write(CHDPAD.encode())
                 else:
                     f.write(NOTEAM.encode())
-                f.write(self.mediaInfo.encode())
+                f.write(self.media_info.encode())
 
     @property
-    def torrentInfo(self):
-        torrent_info = super(CHDBitsEncode, self).torrentInfo
+    def torrent_info(self):
+        torrent_info = super().torrent_info
         torrent_info["team"] = self.team.lower()
         return torrent_info

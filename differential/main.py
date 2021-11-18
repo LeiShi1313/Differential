@@ -23,11 +23,11 @@ def main():
             logger.trace(config)
             REGISTERED_PLUGINS[plugin](**config).upload()
         except TypeError as e:
-            m = re.search(r'missing \d+ required positional arguments: (.*?)$', str(e))
+            m = re.search(r'missing \d+ required positional argument[s]{0,1}: (.*?)$', str(e))
             if m:
                 logger.error("缺少插件必需的参数，请检查输入的参数: {}".format(m.groups()[0]))
-            else:
-                logger.error(e)
+                return
+            raise e
     else:
         PARSER.print_help()
 

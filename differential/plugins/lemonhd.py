@@ -15,5 +15,5 @@ class LemonHD(NexusPHP):
         parser.add_argument('--upload-type', type=str, help="上传类型，默认为电影（movies），其他类型参见柠檬上传URL",
                             default=argparse.SUPPRESS)
 
-    def __init__(self, folder: str, url: str, upload_type='movie', **kwargs):
-        super().__init__(folder, url, upload_url="https://lemonhd.org/upload_{}.php".format(upload_type), **kwargs)
+    def __init__(self, upload_type='movie', **kwargs):
+        super().__init__(upload_url="https://lemonhd.org/upload_{}.php".format(upload_type), **kwargs)
