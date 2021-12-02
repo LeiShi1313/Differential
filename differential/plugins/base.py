@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import json
+import platform
 import tempfile
 import argparse
 from pathlib import Path
@@ -23,26 +24,44 @@ from differential.utils.torrent import make_torrent
 from differential.utils.parse import parse_encoder_log
 from differential.utils.uploader import EasyUpload, AutoFeed
 from differential.utils.binary import ffprobe, execute, execute_with_output
-from differential.utils.mediainfo import get_full_mediainfo, get_resolution, get_duration
-from differential.utils.image import byr_upload, ptpimg_upload, smms_upload, imgurl_upload, chevereto_api_upload, chevereto_username_upload
+from differential.utils.mediainfo import (
+    get_full_mediainfo,
+    get_resolution,
+    get_duration,
+)
+from differential.utils.image import (
+    byr_upload,
+    ptpimg_upload,
+    smms_upload,
+    imgurl_upload,
+    chevereto_api_upload,
+    chevereto_username_upload,
+)
 
 
 PARSER = argparse.ArgumentParser(description="Differential - 差速器 PT快速上传工具")
-PARSER.add_argument('-v', '--version', help="显示差速器当前版本", action='version', version=f"Differential {version}")
+PARSER.add_argument(
+    "-v",
+    "--version",
+    help="显示差速器当前版本",
+    action="version",
+    version=f"Differential {version}",
+)
 subparsers = PARSER.add_subparsers(help="使用下列插件名字来查看插件的详细用法")
 REGISTERED_PLUGINS = {}
 
 
 class PluginRegister(ABCMeta):
-
     def __init__(cls, name, bases, attrs):
         super().__init__(name, bases, attrs)
         # Skip base class
-        if name != 'Base' and name not in REGISTERED_PLUGINS:
+        if name != "Base" and name not in REGISTERED_PLUGINS:
             aliases = (name.lower(),)
-            if 'get_aliases' in cls.__dict__:
+            if "get_aliases" in cls.__dict__:
                 aliases += cls.get_aliases()
-            subparser = subparsers.add_parser(name, aliases=aliases, help=cls.get_help())
+            subparser = subparsers.add_parser(
+                name, aliases=aliases, help=cls.get_help()
+            )
             subparser.set_defaults(plugin=name)
             cls.add_parser(subparser)
             for n in aliases:
@@ -66,43 +85,156 @@ class PluginRegister(ABCMeta):
 
 
 class Base(ABC, TorrnetBase, metaclass=PluginRegister):
-
     @classmethod
     @abstractmethod
     def add_parser(cls, parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-        parser.add_argument('-c', '--config', type=str, help='配置文件的路径，默认为config.ini', default='config.ini')
-        parser.add_argument('-l', '--log', type=str, help='log文件的路径', default=argparse.SUPPRESS)
-        parser.add_argument('-f', '--folder', type=str, help='种子文件夹的路径', default=argparse.SUPPRESS)
-        parser.add_argument('-u', '--url', type=str, help='豆瓣链接', default=argparse.SUPPRESS)
-        parser.add_argument("-uu",'--upload-url', type=str, help="PT站点上传的路径，一般为https://xxxxx.com/upload.php", default=argparse.SUPPRESS)
-        parser.add_argument('-t', '--make-torrent', action="store_true", help="是否制种，默认否", default=argparse.SUPPRESS)
-        parser.add_argument('-n', '--generate-nfo', action="store_true", help="是否用MediaInfo生成NFO文件，默认否",
-                            default=argparse.SUPPRESS)
-        parser.add_argument('-s', '--screenshot-count', type=int, help="截图数量，默认为0，即不生成截图", default=argparse.SUPPRESS)
-        parser.add_argument('--use-short-bdinfo', action="store_true", help="使用QUICK SUMMARY作为BDInfo，默认使用完整BDInfo",
-                            default=argparse.SUPPRESS)
-        parser.add_argument('--optimize-screenshot', action="store_true", help="是否压缩截图（无损），默认压缩",
-                            default=argparse.SUPPRESS)
-        parser.add_argument('--image-hosting', type=ImageHosting,
-                            help=f"图床的类型，现在支持{','.join(i.value for i in ImageHosting)}", default=argparse.SUPPRESS)
-        parser.add_argument('--ptpimg-api-key', type=str, help="PTPIMG的API Key", default=argparse.SUPPRESS)
-        parser.add_argument('--chevereto-hosting-url', type=str, help="自建chevereto图床的地址", default=argparse.SUPPRESS)
-        parser.add_argument('--chevereto-api-key', type=str, help="自建Chevereto的API Key，详情见https://v3-docs.chevereto.com/api/#api-call", default=argparse.SUPPRESS)
-        parser.add_argument('--chevereto-username', type=str, help="如果自建Chevereto的API未开放，请设置username和password", default=argparse.SUPPRESS)
-        parser.add_argument('--chevereto-password', type=str, help="如果自建Chevereto的API未开放，请设置username和password", default=argparse.SUPPRESS)
-        parser.add_argument('--imgurl-api-key', type=str, help="Imgurl的API Key", default=argparse.SUPPRESS)
-        parser.add_argument('--smms-api-key', type=str, help="SM.MS的API Key", default=argparse.SUPPRESS)
-        parser.add_argument('--byr-authorization', type=str, help="BYR的Authorization头，可登录后访问任意页面F12查看，形如Basic xxxxxxxxxxxxxxxx==", default=argparse.SUPPRESS)
-        parser.add_argument('--byr-alternative-url', type=str, help="BYR反代地址(如有)，可为空", default=argparse.SUPPRESS)
-        parser.add_argument('--ptgen-url', type=str, help="自定义PTGEN的地址", default=argparse.SUPPRESS)
-        parser.add_argument('--ptgen-retry', type=int, help="PTGEN重试次数，默认为3次", default=argparse.SUPPRESS)
-        parser.add_argument('--announce-url', type=str, help="制种时announce地址", default=argparse.SUPPRESS)
+        parser.add_argument(
+            "-c",
+            "--config",
+            type=str,
+            help="配置文件的路径，默认为config.ini",
+            default="config.ini",
+        )
+        parser.add_argument(
+            "-l", "--log", type=str, help="log文件的路径", default=argparse.SUPPRESS
+        )
+        parser.add_argument(
+            "-f", "--folder", type=str, help="种子文件夹的路径", default=argparse.SUPPRESS
+        )
+        parser.add_argument(
+            "-u", "--url", type=str, help="豆瓣链接", default=argparse.SUPPRESS
+        )
+        parser.add_argument(
+            "-uu",
+            "--upload-url",
+            type=str,
+            help="PT站点上传的路径，一般为https://xxxxx.com/upload.php",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "-t",
+            "--make-torrent",
+            action="store_true",
+            help="是否制种，默认否",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "-n",
+            "--generate-nfo",
+            action="store_true",
+            help="是否用MediaInfo生成NFO文件，默认否",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "-s",
+            "--screenshot-count",
+            type=int,
+            help="截图数量，默认为0，即不生成截图",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--use-short-bdinfo",
+            action="store_true",
+            help="使用QUICK SUMMARY作为BDInfo，默认使用完整BDInfo",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--optimize-screenshot",
+            action="store_true",
+            help="是否压缩截图（无损），默认压缩",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--image-hosting",
+            type=ImageHosting,
+            help=f"图床的类型，现在支持{','.join(i.value for i in ImageHosting)}",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--ptpimg-api-key",
+            type=str,
+            help="PTPIMG的API Key",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--chevereto-hosting-url",
+            type=str,
+            help="自建chevereto图床的地址",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--chevereto-api-key",
+            type=str,
+            help="自建Chevereto的API Key，详情见https://v3-docs.chevereto.com/api/#api-call",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--chevereto-username",
+            type=str,
+            help="如果自建Chevereto的API未开放，请设置username和password",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--chevereto-password",
+            type=str,
+            help="如果自建Chevereto的API未开放，请设置username和password",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--imgurl-api-key",
+            type=str,
+            help="Imgurl的API Key",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--smms-api-key", type=str, help="SM.MS的API Key", default=argparse.SUPPRESS
+        )
+        parser.add_argument(
+            "--byr-authorization",
+            type=str,
+            help="BYR的Authorization头，可登录后访问任意页面F12查看，形如Basic xxxxxxxxxxxxxxxx==",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--byr-alternative-url",
+            type=str,
+            help="BYR反代地址(如有)，可为空",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--ptgen-url", type=str, help="自定义PTGEN的地址", default=argparse.SUPPRESS
+        )
+        parser.add_argument(
+            "--ptgen-retry", type=int, help="PTGEN重试次数，默认为3次", default=argparse.SUPPRESS
+        )
+        parser.add_argument(
+            "--announce-url", type=str, help="制种时announce地址", default=argparse.SUPPRESS
+        )
 
-        parser.add_argument("--encoder-log", type=str, help="压制log的路径", default=argparse.SUPPRESS)
+        parser.add_argument(
+            "--encoder-log", type=str, help="压制log的路径", default=argparse.SUPPRESS
+        )
         upload_option_group = parser.add_mutually_exclusive_group()
-        upload_option_group.add_argument("--easy-upload", action="store_true", help="使用树大Easy Upload插件自动填充", dest="easy_upload", default=argparse.SUPPRESS)
-        upload_option_group.add_argument("--auto-feed", action="store_true", help="使用明日大Auto Feed插件自动填充", dest="auto_feed",default=argparse.SUPPRESS)
-        parser.add_argument("--trim-description", action="store_true", help="是否在生成的链接中省略种子描述，该选项主要是为了解决浏览器限制URL长度的问题，默认关闭", default=argparse.SUPPRESS)
+        upload_option_group.add_argument(
+            "--easy-upload",
+            action="store_true",
+            help="使用树大Easy Upload插件自动填充",
+            dest="easy_upload",
+            default=argparse.SUPPRESS,
+        )
+        upload_option_group.add_argument(
+            "--auto-feed",
+            action="store_true",
+            help="使用明日大Auto Feed插件自动填充",
+            dest="auto_feed",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--trim-description",
+            action="store_true",
+            help="是否在生成的链接中省略种子描述，该选项主要是为了解决浏览器限制URL长度的问题，默认关闭",
+            default=argparse.SUPPRESS,
+        )
         return parser
 
     def __init__(
@@ -114,8 +246,8 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         optimize_screenshot: bool = True,
         use_short_bdinfo: bool = False,
         image_hosting: ImageHosting = ImageHosting.PTPIMG,
-        chevereto_hosting_url: str = '',
-        imgurl_hosting_url: str = '',
+        chevereto_hosting_url: str = "",
+        imgurl_hosting_url: str = "",
         ptpimg_api_key: str = None,
         chevereto_api_key: str = None,
         chevereto_username: str = None,
@@ -125,7 +257,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         byr_authorization: str = None,
         byr_alternative_url: str = None,
         ptgen_url: str = "https://ptgen.lgto.workers.dev",
-        announce_url: str = 'https://example.com',
+        announce_url: str = "https://example.com",
         ptgen_retry: int = 3,
         generate_nfo: bool = False,
         make_torrent: bool = False,
@@ -175,9 +307,11 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         for count, img in enumerate(sorted(Path(img_dir).glob("*.png"))):
             if img.is_file():
                 img_url = None
-                img_url_file = img.resolve().parent.joinpath(".{}.{}".format(self.image_hosting.value, img.stem))
+                img_url_file = img.resolve().parent.joinpath(
+                    ".{}.{}".format(self.image_hosting.value, img.stem)
+                )
                 if img_url_file.is_file():
-                    with open(img_url_file, 'r') as f:
+                    with open(img_url_file, "r") as f:
                         img_url = f.read().strip()
                         logger.info(f"发现已上传的第{count + 1}张截图链接：{img_url}")
                 else:
@@ -188,21 +322,34 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                             logger.error("Chevereto地址未提供，请设置chevereto_hosting_url")
                             sys.exit(1)
                         if self.chevereto_api_key:
-                            img_url = chevereto_api_upload(img, self.chevereto_hosting_url, self.chevereto_api_key)
+                            img_url = chevereto_api_upload(
+                                img, self.chevereto_hosting_url, self.chevereto_api_key
+                            )
                         elif self.chevereto_username and self.chevereto_password:
-                            img_url = chevereto_username_upload(img, self.chevereto_hosting_url, self.chevereto_username, self.chevereto_password)
+                            img_url = chevereto_username_upload(
+                                img,
+                                self.chevereto_hosting_url,
+                                self.chevereto_username,
+                                self.chevereto_password,
+                            )
                         else:
-                            logger.error("Chevereto的API或用户名或密码未设置，请检查chevereto-username/chevereto-password设置")
+                            logger.error(
+                                "Chevereto的API或用户名或密码未设置，请检查chevereto-username/chevereto-password设置"
+                            )
                     elif self.image_hosting == ImageHosting.IMGURL:
-                        img_url = imgurl_upload(img, self.imgurl_hosting_url, self.imgurl_api_key)
+                        img_url = imgurl_upload(
+                            img, self.imgurl_hosting_url, self.imgurl_api_key
+                        )
                     elif self.image_hosting == ImageHosting.SMMS:
                         img_url = smms_upload(img, self.smms_api_key)
                     elif self.image_hosting == ImageHosting.BYR:
-                        img_url = byr_upload(img, self.byr_authorization, self.byr_alternative_url)
+                        img_url = byr_upload(
+                            img, self.byr_authorization, self.byr_alternative_url
+                        )
 
                 if img_url:
                     logger.info(f"第{count + 1}张截图地址：{img_url}")
-                    with open(img_url_file, 'w') as f:
+                    with open(img_url_file, "w") as f:
                         f.write(img_url)
                     img_urls.append(img_url)
                 else:
@@ -225,11 +372,11 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             return ptgen_failed
 
         # 尝试获取IMDB描述
-        if req.json().get('site') != 'imdb':
-            if req.json().get('imdb_link'):
-                imdb_params = {'url': req.json().get('imdb_link')}
+        if req.json().get("site") != "imdb":
+            if req.json().get("imdb_link"):
+                imdb_params = {"url": req.json().get("imdb_link")}
                 imdb_req = requests.get(self.ptgen_url, imdb_params)
-                if imdb_req.ok and imdb_req.json().get('success'):
+                if imdb_req.ok and imdb_req.json().get("success"):
                     self._imdb = imdb_req.json()
         else:
             self._imdb = req.json()
@@ -242,23 +389,36 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         bdinfos = []
         for f in self.folder.glob("**/BDMV"):
             logger.info(f"正在扫描{f.parent}...")
-            execute_with_output(
-                "mono", 
-                f'''"{os.path.join(os.path.dirname(tools.__file__), 'BDinfoCli.0.7.3/BDInfo.exe')}" -w '''
-                f'"{f.parent}" {temp_dir}',
-                abort=True)
+            if platform.system() == "Windows":
+                execute_with_output(
+                    os.path.join(
+                        os.path.dirname(tools.__file__), "BDinfoCli.0.7.3\BDInfo.exe"
+                    ),
+                    f'-w "{f.parent}" {temp_dir}',
+                    abort=True,
+                )
+            else:
+                execute_with_output(
+                    "mono",
+                    f""""{os.path.join(os.path.dirname(tools.__file__), 'BDinfoCli.0.7.3/BDInfo.exe')}" -w """
+                    f'"{f.parent}" {temp_dir}',
+                    abort=True,
+                )
         for info in Path(temp_dir).glob("*.txt"):
-            with info.open('r') as f:
+            with info.open("r") as f:
                 content = f.read()
             if self.use_short_bdinfo:
-                m = re.search(r'(QUICK SUMMARY:\n+(.+?\n)+)\n\n', content)
+                m = re.search(r"(QUICK SUMMARY:\n+(.+?\n)+)\n\n", content)
                 if m:
                     bdinfos.append(m.groups()[0])
             else:
-                m = re.search(r'(DISC INFO:\n+(.+?\n{1,2})+)\[\/code\]\n<---- END FORUMS PASTE ---->', content)
+                m = re.search(
+                    r"(DISC INFO:\n+(.+?\n{1,2})+)\[\/code\]\n<---- END FORUMS PASTE ---->",
+                    content,
+                )
                 if m:
                     bdinfos.append(m.groups()[0])
-        return '\n\n'.join(bdinfos)
+        return "\n\n".join(bdinfos)
 
     def _find_mediainfo(self) -> MediaInfo:
         # Always find the biggest file in the folder
@@ -270,9 +430,9 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             biggest_size = -1
             biggest_file = None
             has_bdmv = False
-            for f in self.folder.glob('**/*'):
+            for f in self.folder.glob("**/*"):
                 if f.is_file():
-                    if f.suffix == '.bdmv':
+                    if f.suffix == ".bdmv":
                         has_bdmv = True
                     s = os.stat(f.absolute()).st_size
                     if s > biggest_size:
@@ -294,10 +454,12 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     def _generate_nfo(self):
         logger.info("正在生成nfo文件...")
         if self.folder.is_file():
-            with open(f"{self.folder.resolve().parent.joinpath(self.folder.stem)}.nfo", 'wb') as f:
+            with open(
+                f"{self.folder.resolve().parent.joinpath(self.folder.stem)}.nfo", "wb"
+            ) as f:
                 f.write(self.media_info.encode())
         elif self.folder.is_dir():
-            with open(self.folder.joinpath(f"{self.folder.name}.nfo"), 'wb') as f:
+            with open(self.folder.joinpath(f"{self.folder.name}.nfo"), "wb") as f:
                 f.write(self.media_info.encode())
 
     def _make_screenshots(self) -> Optional[str]:
@@ -310,20 +472,31 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         # 查找已有的截图
         for f in Path(tempfile.gettempdir()).glob("Differential*"):
             if f.is_dir() and self.folder.name in f.name:
-                if self.screenshot_count > 0 and len(list(f.glob("*.png"))) == self.screenshot_count:
+                if (
+                    self.screenshot_count > 0
+                    and len(list(f.glob("*.png"))) == self.screenshot_count
+                ):
                     temp_dir = f.absolute()
                     logger.info("发现已生成的{}张截图，跳过截图...".format(self.screenshot_count))
                     break
         else:
-            temp_dir = tempfile.mkdtemp(prefix="Differential.{}.".format(version), suffix=self.folder.name)
+            temp_dir = tempfile.mkdtemp(
+                prefix="Differential.{}.".format(version), suffix=self.folder.name
+            )
             # 生成截图
             for i in range(1, self.screenshot_count + 1):
                 logger.info(f"正在生成第{i}张截图...")
                 t = int(i * duration / (self.screenshot_count + 1))
-                screenshot_path = f'{temp_dir}/{self._main_file.stem}.thumb_{str(i).zfill(2)}.png'
-                execute("ffmpeg", (
-                    f'-y -ss {t}ms -skip_frame nokey -i "{self._main_file.absolute()}" '
-                    f'-s {resolution} -vsync 0 -vframes 1 -c:v png "{screenshot_path}"'))
+                screenshot_path = (
+                    f"{temp_dir}/{self._main_file.stem}.thumb_{str(i).zfill(2)}.png"
+                )
+                execute(
+                    "ffmpeg",
+                    (
+                        f'-y -ss {t}ms -skip_frame nokey -i "{self._main_file.absolute()}" '
+                        f'-s {resolution} -vsync 0 -vframes 1 -c:v png "{screenshot_path}"'
+                    ),
+                )
                 if self.optimize_screenshot:
                     image = Image.open(screenshot_path)
                     image.save(f"{screenshot_path}", format="PNG", optimized=True)
@@ -350,7 +523,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     def _prepare(self):
         ptgen_retry = self.ptgen_retry
         self._ptgen = self._get_ptgen()
-        while self._ptgen.get('failed') and ptgen_retry > 0:
+        while self._ptgen.get("failed") and ptgen_retry > 0:
             self._ptgen = self._get_ptgen()
             ptgen_retry -= 1
         self._mediainfo = self._find_mediainfo()
@@ -367,16 +540,18 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     @property
     def title(self):
         # TODO: Either use file name or generate from mediainfo and ptgen
-        temp_name = (self.folder.name if self.folder.is_dir() else self.folder.stem).replace('.', ' ')
-        temp_name = temp_name.replace('5 1 ', '5.1 ')
-        temp_name = temp_name.replace('7 1 ', '7.1 ')
+        temp_name = (
+            self.folder.name if self.folder.is_dir() else self.folder.stem
+        ).replace(".", " ")
+        temp_name = temp_name.replace("5 1 ", "5.1 ")
+        temp_name = temp_name.replace("7 1 ", "7.1 ")
         return temp_name
 
     @property
     def subtitle(self):
         if not self._ptgen.get("site") == "douban":
             return ""
-        if 'chinese_title' in self._ptgen:
+        if "chinese_title" in self._ptgen:
             subtitle = f"{'/'.join([self._ptgen.get('chinese_title')] + self._ptgen.get('aka', []))}"
         else:
             subtitle = f"{'/'.join(self._ptgen.get('aka', []))}"
@@ -416,7 +591,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def original_description(self):
-        return ''
+        return ""
 
     @property
     def douban_url(self):
@@ -426,7 +601,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def douban_info(self):
-        return ''
+        return ""
 
     @property
     def imdb_url(self):
@@ -499,7 +674,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                     return track.encoded_library_name
                 if track.commercial_name == "AVC":
                     return "h264"
-                if track.commercial_name == 'HEVC':
+                if track.commercial_name == "HEVC":
                     return "hevc"
         #  h264: "AVC/H.264",
         #  hevc: "HEVC",

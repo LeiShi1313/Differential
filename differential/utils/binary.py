@@ -14,6 +14,9 @@ def find_binary(name: str, alternative_names: list = None) -> Optional[Path]:
     if alternative_names is None:
         alternative_names = []
 
+    if Path(name).is_file():
+        return name
+
     path = os.environ.get(f"{name.upper()}PATH")
     if path:
         pp = Path(path)
