@@ -17,6 +17,7 @@ from torf import Torrent
 from loguru import logger
 from pymediainfo import MediaInfo
 
+from differential import tools
 from differential.torrent import TorrnetBase
 from differential.version import version
 from differential.constants import ImageHosting
@@ -24,8 +25,8 @@ from differential.utils.browser import open_link
 from differential.utils.mediainfo import get_track_attr
 from differential.utils.torrent import make_torrent
 from differential.utils.parse import parse_encoder_log
-from differential.utils.binary import ffprobe, execute
 from differential.utils.uploader import EasyUpload, AutoFeed
+from differential.utils.binary import ffprobe, execute, execute_with_output
 from differential.utils.mediainfo import get_track_attr, get_full_mediainfo, get_resolution, get_duration
 from differential.utils.image import byr_upload, ptpimg_upload, smms_upload, imgurl_upload, chevereto_api_upload, chevereto_username_upload
 
@@ -82,13 +83,14 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         parser.add_argument('-n', '--generate-nfo', action="store_true", help="是否用MediaInfo生成NFO文件，默认否",
                             default=argparse.SUPPRESS)
         parser.add_argument('-s', '--screenshot-count', type=int, help="截图数量，默认为0，即不生成截图", default=argparse.SUPPRESS)
+        parser.add_argument('--use-short-bdinfo', action="store_true", help="使用QUICK SUMMARY作为BDInfo，默认使用完整BDInfo",
+                            default=argparse.SUPPRESS)
         parser.add_argument('--optimize-screenshot', action="store_true", help="是否压缩截图（无损），默认压缩",
                             default=argparse.SUPPRESS)
         parser.add_argument('--image-hosting', type=ImageHosting,
                             help=f"图床的类型，现在支持{','.join(i.value for i in ImageHosting)}", default=argparse.SUPPRESS)
-        parser.add_argument('--imgurl-hosting-url', type=str, help="自建imgurl图床的地址", default=argparse.SUPPRESS)
-        parser.add_argument('--chevereto-hosting-url', type=str, help="自建chevereto图床的地址", default=argparse.SUPPRESS)
         parser.add_argument('--ptpimg-api-key', type=str, help="PTPIMG的API Key", default=argparse.SUPPRESS)
+        parser.add_argument('--chevereto-hosting-url', type=str, help="自建chevereto图床的地址", default=argparse.SUPPRESS)
         parser.add_argument('--chevereto-api-key', type=str, help="自建Chevereto的API Key，详情见https://v3-docs.chevereto.com/api/#api-call", default=argparse.SUPPRESS)
         parser.add_argument('--chevereto-username', type=str, help="如果自建Chevereto的API未开放，请设置username和password", default=argparse.SUPPRESS)
         parser.add_argument('--chevereto-password', type=str, help="如果自建Chevereto的API未开放，请设置username和password", default=argparse.SUPPRESS)
@@ -114,6 +116,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         upload_url: str,
         screenshot_count: int = 0,
         optimize_screenshot: bool = True,
+        use_short_bdinfo: bool = False,
         image_hosting: ImageHosting = ImageHosting.PTPIMG,
         chevereto_hosting_url: str = '',
         imgurl_hosting_url: str = '',
@@ -141,6 +144,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.upload_url = upload_url
         self.screenshot_count = screenshot_count
         self.optimize_screenshot = optimize_screenshot
+        self.use_short_bdinfo = use_short_bdinfo
         self.image_hosting = image_hosting
         self.chevereto_hosting_url = chevereto_hosting_url
         self.imgurl_hosting_url = imgurl_hosting_url
@@ -162,6 +166,8 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.trim_description = trim_description
         self.encoder_log = encoder_log
 
+        self.is_bdmv = False
+        self._bdinfo = None
         self._main_file: Optional[Path] = None
         self._ptgen: dict = {}
         self._imdb: dict = {}
@@ -234,6 +240,30 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         logger.info(f"获取PTGen成功 {req.json().get('chinese_title', '')}")
         return req.json()
 
+    def _get_bdinfo(self) -> str:
+        logger.info("目标为BDMV，正在扫描BDInfo...")
+        temp_dir = tempfile.mkdtemp()
+        bdinfos = []
+        for f in self.folder.glob("**/BDMV"):
+            logger.info(f"正在扫描{f.parent}...")
+            execute_with_output(
+                "mono", 
+                f'''"{os.path.join(os.path.dirname(tools.__file__), 'BDinfoCli.0.7.3/BDInfo.exe')}" -w '''
+                f'"{f.parent}" {temp_dir}',
+                abort=True)
+        for info in tempfile.glob("*.txt"):
+            with info.open('r') as f:
+                content = f.read()
+            if self.use_short_bdinfo:
+                m = re.search(r'(QUICK SUMMARY:\n+(.+?\n)+)\n\n', content)
+                if m:
+                    bdinfos.append(m.groups()[0])
+            else:
+                m = re.search(r'(DISC INFO:\n+(.+?\n{1,2})+)\[\/code\]\n<---- END FORUMS PASTE ---->', content)
+                if m:
+                    bdinfos.append(m.groups()[0])
+        return '\n\n'.join(bdinfos)
+
     def _find_mediainfo(self) -> MediaInfo:
         # Always find the biggest file in the folder
         logger.info(f"正在获取Mediainfo: {self.folder}")
@@ -243,8 +273,11 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             logger.info("目标为文件夹，正在获取最大的文件...")
             biggest_size = -1
             biggest_file = None
+            has_bdmv = False
             for f in self.folder.glob('**/*'):
                 if f.is_file():
+                    if f.suffix == '.bdmv':
+                        has_bdmv = True
                     s = os.stat(f.absolute()).st_size
                     if s > biggest_size:
                         biggest_size = s
@@ -257,6 +290,9 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         mediainfo = MediaInfo.parse(self._main_file)
         logger.info(f"已获取Mediainfo: {self._main_file}")
         logger.trace(mediainfo.to_data())
+        if has_bdmv:
+            self.is_bdmv = True
+            self._bdinfo = self._get_bdinfo()
         return mediainfo
 
     def _generate_nfo(self):
@@ -291,7 +327,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 screenshot_path = f'{temp_dir}/{self._main_file.stem}.thumb_{str(i).zfill(2)}.png'
                 execute("ffmpeg", (
                     f'-y -ss {t}ms -skip_frame nokey -i "{self._main_file.absolute()}" '
-                    f'-s {resolution} -vsync 0 -vframes 1 -c:v png -v quiet "{screenshot_path}"'))
+                    f'-s {resolution} -vsync 0 -vframes 1 -c:v png "{screenshot_path}"'))
                 if self.optimize_screenshot:
                     image = Image.open(screenshot_path)
                     image.save(f"{screenshot_path}", format="PNG", optimized=True)
@@ -364,7 +400,10 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def media_info(self):
-        return get_full_mediainfo(self._mediainfo)
+        if self.is_bdmv:
+            return self._bdinfo
+        else:
+            return get_full_mediainfo(self._mediainfo)
 
     @property
     def media_infos(self):

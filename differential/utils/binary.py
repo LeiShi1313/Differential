@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import shutil
 import subprocess
@@ -38,8 +39,7 @@ def find_binary(name: str, alternative_names: list = None) -> Optional[Path]:
     )
     return None
 
-
-def execute(binary_name: str, args: str, abort: bool = False) -> str:
+def build_cmd(binary_name: str, args: str, abort: bool = False) -> str:
     executable = find_binary(binary_name)
     if executable is None:
         if abort:
@@ -48,9 +48,37 @@ def execute(binary_name: str, args: str, abort: bool = False) -> str:
             return ""
     cmd = f'"{executable}" {args}'
     logger.trace(cmd)
+    return cmd
+
+def execute_with_output(binary_name: str, args: str, abort: bool = False) -> int:
+    cmd = build_cmd(binary_name, args, abort)
+    return_code = 0
+
+    def _execute():
+        proc = subprocess.Popen(cmd, shell=True, bufsize=1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                     universal_newlines=True)
+        for stdout in iter(proc.stdout.readline, ""):
+            yield stdout
+        proc.stdout.close()
+        return_code = proc.wait()
+    prev = ''
+    for out in iter(_execute()):
+        out = out.strip()
+        if re.sub('(\d| )', '', out) != re.sub('(\d| )', '', prev):
+            print(out)
+        else:
+            print(out, end='\r')
+        sys.stdout.flush()
+        prev = out
+    if return_code != 0:
+        logger.warning(f"{binary_name} exit with return code {return_code}")
+    return return_code
+    
+
+def execute(binary_name: str, args: str, abort: bool = False) -> str:
+    cmd = build_cmd(binary_name, args, abort)
     proc = subprocess.run(
-        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     logger.trace(proc)
     ret = "\n".join([proc.stdout.decode(), proc.stderr.decode()])
     if proc.returncode != 0:
