@@ -310,7 +310,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         # 查找已有的截图
         for f in Path(tempfile.gettempdir()).glob("Differential*"):
             if f.is_dir() and self.folder.name in f.name:
-                if len(list(f.glob("*.png"))) == self.screenshot_count:
+                if self.screenshot_count > 0 and len(list(f.glob("*.png"))) == self.screenshot_count:
                     temp_dir = f.absolute()
                     logger.info("发现已生成的{}张截图，跳过截图...".format(self.screenshot_count))
                     break
