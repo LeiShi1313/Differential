@@ -443,6 +443,9 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         if self._main_file is None:
             logger.error("未在目标目录找到文件！")
             sys.exit(1)
+        elif self._main_file.suffix == '.iso':
+            logger.error("请将iso文件挂载后再使用差速器")
+            sys.exit(1)
         mediainfo = MediaInfo.parse(self._main_file)
         logger.info(f"已获取Mediainfo: {self._main_file}")
         logger.trace(mediainfo.to_data())
