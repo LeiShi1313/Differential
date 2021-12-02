@@ -8,6 +8,7 @@ from loguru import logger
 
 sessions = {}
 
+
 def chevereto_api_upload(img: Path, url: str, api_key: str) -> Optional[str]:
     data = {'key': api_key}
     files = {'source': open(img, 'rb')}

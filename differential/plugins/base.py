@@ -1,19 +1,15 @@
 import os
-import re
 import sys
 import json
-import shutil
 import tempfile
 import argparse
 from pathlib import Path
-from decimal import Decimal
 from typing import Optional
 from urllib.parse import quote
 from abc import ABC, ABCMeta, abstractmethod
 
 import requests
 from PIL import Image
-from torf import Torrent
 from loguru import logger
 from pymediainfo import MediaInfo
 
@@ -22,12 +18,11 @@ from differential.torrent import TorrnetBase
 from differential.version import version
 from differential.constants import ImageHosting
 from differential.utils.browser import open_link
-from differential.utils.mediainfo import get_track_attr
 from differential.utils.torrent import make_torrent
 from differential.utils.parse import parse_encoder_log
 from differential.utils.uploader import EasyUpload, AutoFeed
 from differential.utils.binary import ffprobe, execute, execute_with_output
-from differential.utils.mediainfo import get_track_attr, get_full_mediainfo, get_resolution, get_duration
+from differential.utils.mediainfo import get_full_mediainfo, get_resolution, get_duration
 from differential.utils.image import byr_upload, ptpimg_upload, smms_upload, imgurl_upload, chevereto_api_upload, chevereto_username_upload
 
 
@@ -627,16 +622,18 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     def comparisons(self):
         return []
 
-    # Auto feed
     @property
-    def uploader_auto_feed(self):
-        return AutoFeed(plugin=self)
+    def easy_upload_torrent_info(self):
+        return EasyUpload(plugin=self).torrent_info
+
+    @property
+    def auto_feed_info(self):
+        return AutoFeed(plugin=self).info
 
     def upload(self):
         self._prepare()
         if self.easy_upload:
-            easy_upload = EasyUpload(plugin=self)
-            torrent_info = easy_upload.torrent_info
+            torrent_info = self.easy_upload_torrent_info
             if self.trim_description:
                 # 直接打印简介部分来绕过浏览器的链接长度限制
                 torrent_info["description"] = ""
@@ -647,10 +644,9 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 logger.info(f"种子描述：\n{self.description}")
             open_link(link)
         elif self.auto_feed:
-            auto_feed = AutoFeed(plugin=self)
-            link = f"{self.upload_url}{quote(auto_feed.info, safe='#:/=@')}"
-            if self.trim_description:
-                logger.info(f"种子描述：\n{self.description}")
+            link = f"{self.upload_url}{quote(self.auto_feed_info, safe='#:/=@')}"
+            # if self.trim_description:
+            #     logger.info(f"种子描述：\n{self.description}")
             logger.trace(f"已生成自动上传链接：{link}")
             open_link(link)
         else:

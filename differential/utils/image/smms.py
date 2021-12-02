@@ -5,6 +5,7 @@ from typing import Optional
 import requests
 from loguru import logger
 
+
 def smms_upload(img: Path, api_key: str) -> Optional[str]:
     data = {'Authorization': api_key}
     files = {'smfile': open(img, 'rb'), 'format': 'json'}

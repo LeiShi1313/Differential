@@ -1,21 +1,12 @@
-import os
 import re
-import sys
-import shutil
-import platform
-import argparse
-import subprocess
-import webbrowser
 from pathlib import Path
 from decimal import Decimal
 from typing import Optional, List
-from configparser import ConfigParser
 
 from loguru import logger
 from pymediainfo import Track, MediaInfo
 
 from differential.utils.binary import ffprobe
-from differential.constants import ImageHosting, BOOLEAN_STATES, BOOLEAN_ARGS
 
 
 def get_track_attr(
