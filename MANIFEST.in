@@ -1,2 +1,3 @@
 include pyproject.toml
 exclude usage.gif
+include differential/tools/**/*

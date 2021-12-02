@@ -246,7 +246,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 f'''"{os.path.join(os.path.dirname(tools.__file__), 'BDinfoCli.0.7.3/BDInfo.exe')}" -w '''
                 f'"{f.parent}" {temp_dir}',
                 abort=True)
-        for info in tempfile.glob("*.txt"):
+        for info in Path(temp_dir).glob("*.txt"):
             with info.open('r') as f:
                 content = f.read()
             if self.use_short_bdinfo:
