@@ -413,7 +413,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                     bdinfos.append(m.groups()[0])
             else:
                 m = re.search(
-                    r"(DISC INFO:\n+(.+?\n{1,2})+)\[\/code\]\n<---- END FORUMS PASTE ---->",
+                    r"(DISC INFO:\n+(.+?\n{1,2})+?)(?:CHAPTERS:\n|STREAM DIAGNOSTICS:\n|\[\/code\]\n<---- END FORUMS PASTE ---->)",
                     content,
                 )
                 if m:
