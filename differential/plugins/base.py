@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import json
+import shutil
 import platform
 import tempfile
 import argparse
@@ -418,6 +419,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 )
                 if m:
                     bdinfos.append(m.groups()[0])
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return "\n\n".join(bdinfos)
 
     def _find_mediainfo(self) -> MediaInfo:
