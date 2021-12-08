@@ -236,6 +236,12 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             help="是否在生成的链接中省略种子描述，该选项主要是为了解决浏览器限制URL长度的问题，默认关闭",
             default=argparse.SUPPRESS,
         )
+        parser.add_argument(
+            "--use-short-url",
+            action="store_true",
+            help="是否缩短生成的上传链接",
+            default=argparse.SUPPRESS,
+        )
         return parser
 
     def __init__(
@@ -265,6 +271,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         easy_upload: bool = False,
         auto_feed: bool = False,
         trim_description: bool = False,
+        use_short_url: bool = False,
         encoder_log: str = "",
         **kwargs,
     ):
@@ -293,6 +300,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.easy_upload = easy_upload
         self.auto_feed = auto_feed
         self.trim_description = trim_description
+        self.use_short_url = use_short_url
         self.encoder_log = encoder_log
 
         self.is_bdmv = False
@@ -548,8 +556,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         temp_name = (
             self.folder.name if self.folder.is_dir() else self.folder.stem
         ).replace(".", " ")
-        temp_name = temp_name.replace("5 1 ", "5.1 ")
-        temp_name = temp_name.replace("7 1 ", "7.1 ")
+        temp_name = re.sub(r'(?<=5|7)( )1(?=.*$)', '.1', temp_name)
         return temp_name
 
     @property
@@ -823,13 +830,13 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             logger.trace(f"已生成自动上传链接：{link}")
             if self.trim_description:
                 logger.info(f"种子描述：\n{self.description}")
-            open_link(link)
+            open_link(link, self.use_short_url)
         elif self.auto_feed:
             link = f"{self.upload_url}{quote(self.auto_feed_info, safe='#:/=@')}"
             # if self.trim_description:
             #     logger.info(f"种子描述：\n{self.description}")
             logger.trace(f"已生成自动上传链接：{link}")
-            open_link(link)
+            open_link(link, self.use_short_url)
         else:
             logger.info(
                 "\n"

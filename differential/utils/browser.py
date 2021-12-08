@@ -1,9 +1,16 @@
+import requests
 import webbrowser
 
 from loguru import logger
+from differential.constants import URL_SHORTENER_PATH
 
 
-def open_link(link: str):
+def open_link(link: str, use_short_url: bool = False):
+    if use_short_url:
+        req = requests.post(f"{URL_SHORTENER_PATH}/new", {"url": link})
+        if req.ok:
+            link = f"{URL_SHORTENER_PATH}/dft/{req.text}"
+
     try:
         browser = webbrowser.get()
     except webbrowser.Error:
