@@ -14,6 +14,7 @@
 # 如何安装差速器
 
 ## Linux
+按照[这个](https://www.mono-project.com/download/stable/#download-lin)页面，安装Mono
 
 ```shell
 # 安装ffmpeg和mediainfo
@@ -30,10 +31,11 @@ pip.exe install Differential
 ```
 
 ## Mac OS
+按照[这个](https://www.mono-project.com/docs/getting-started/install/mac/)页面，安装Mono
 
 ```shell
-# 安装ffmpeg
-brew install ffmpeg
+# 安装ffmpeg、mediainfo
+brew install ffmpeg mediainfo
 pip install Differential
 ```
 
