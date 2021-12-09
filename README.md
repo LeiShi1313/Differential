@@ -58,6 +58,7 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 - `upload_url`: 发种页面的地址
 - `make_torrent`: 是否制种，默认关闭
 - `geenrate_nfo`: 是否利用mediainfo生成nfo文件，默认关闭
+- `use_short_bdinfo`: 是否使用BDInfo的Quick Summary，默认使用完整的BDInfo
 - `screenshot_count`: 截图生成的张数，默认为0，即不生成截图
 - `image_hosting`: 图床的名称，现在支持ptpimg,chevereto,imgurl和SM.MS
 - `image_hosting_url`: 如果是自建的图床，提供图床链接
@@ -67,6 +68,7 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 - `easy_upload`: 默认关闭，开启的话会利用[easy-upload](https://github.com/techmovie/easy-upload)自动填充发种页面表单
 - `auto_feed`: 默认关闭，开启的话会利用[auto_feed_js](https://github.com/tomorrow505/auto_feed_js)自动填充发种页面表单
 - `trim_description`: 默认关闭，开启的话会省略掉上传链接的描述部分，以避免链接过长浏览器无法打开的问题
+- `use_short_url`: 默认关闭，开启的话使用短链接服务把上传链接缩短
 
 ## 其他插件
 
@@ -75,6 +77,7 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 
 # TODO
 - [ ] 更好的出错管理
+- [ ] PTGen API Key支持
+- [x] 短网址服务
 - [x] 识别已经生成过的截图，不重复截图
 - [x] 支持扫描原盘BDInfo
-- [ ] PTGen API Key支持
