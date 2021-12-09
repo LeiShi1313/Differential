@@ -1,26 +1,35 @@
 [DEFAULT]
-generate_nfo = false
-make_torrent = false
-screenshot_count = 0
-optimize_screenshot = true
-image_hosting = PTPIMG
+; 是否制种
+make_torrent = true
+
+; 生成截图的数量
+screenshot_count = 6
+; 图床，差速器支持PTPIMG、自建imgurl、自建Chevereto（z4a、imgbb、猫柠的图床等）、SM.MS和BYR作为图床
+image_hosting = CHEVERETO
+; 自建Chevereto的地址
+chevereto_hosting_url = https://XXX.com
+; 自建Chevereto的用户名
+chevereto_username = XXXX
+; 自建Chevereto的密码
+chevereto_password = YYYY
+; 如果使用PTPIMG作为图床，需要设置API Key
 ptpimg_api_key = XXXXXXXXXXXXX
-# image_hosting_url =
-# chevereto_api_key =
-# imgurl_api_key =
-# smms_api_key =
-# ptgen_url = https://api.douban.workers.dev
-# ptgen_retry = 3
-# announce_url =
+
+; 自动填充使用的脚本，这里使用树大的脚本
+easy_upload = true
+; 也可以使用明日大的脚本来进行自动填充
+; auto_feed = true
+
+; 使用差速器自带的短网址服务
+use_short_url = true
+
+; 差速器自带一个自建的PTGen，如果无法访问，可以提供自定义PTGen地址
+;ptgen_url = https://XXXXX.com
 
 [NexusPHP]
-# 每个插件都可以重新定义各个参数，并且会覆盖默认参数
-# upload_url = http://127.0.0.1:8000/upload.php
-# generate_nfo = true
-# make_torrent = true
-# encoder_log =
-# easy_upload = true
-# trim_description = false
+; 发种页面的链接
+upload_url = https://XXXXX.com/upload.php
+
 
 [PTerClub]
 
