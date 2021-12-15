@@ -13,6 +13,8 @@
 
 # 如何安装差速器
 
+> 可以移步我的[博客](https://lg.to/dft)查看详细的教程
+
 ## Linux
 按照[这个](https://www.mono-project.com/download/stable/#download-lin)页面，安装Mono
 
