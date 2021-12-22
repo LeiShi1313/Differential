@@ -330,6 +330,8 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                         if not self.chevereto_hosting_url:
                             logger.error("Chevereto地址未提供，请设置chevereto_hosting_url")
                             sys.exit(1)
+                        if self.chevereto_hosting_url.endswith('/'):
+                            self.chevereto_hosting_url = self.chevereto_hosting_url[:-1]
                         if self.chevereto_api_key:
                             img_url = chevereto_api_upload(
                                 img, self.chevereto_hosting_url, self.chevereto_api_key
