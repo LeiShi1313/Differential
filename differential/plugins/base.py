@@ -433,13 +433,13 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     def _find_mediainfo(self) -> MediaInfo:
         # Always find the biggest file in the folder
         logger.info(f"正在获取Mediainfo: {self.folder}")
+        has_bdmv = False
         if self.folder.is_file():
             self._main_file = self.folder
         else:
             logger.info("目标为文件夹，正在获取最大的文件...")
             biggest_size = -1
             biggest_file = None
-            has_bdmv = False
             for f in self.folder.glob("**/*"):
                 if f.is_file():
                     if f.suffix == ".bdmv":
