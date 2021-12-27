@@ -21,7 +21,7 @@
 
 ```shell
 # 安装ffmpeg和mediainfo
-sudo apt install ffmpeg mediainfo
+sudo apt install ffmpeg mediainfo zlib1g-dev libjpeg-dev
 pip3 install Differential
 ```
 
