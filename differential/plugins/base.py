@@ -348,12 +348,16 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                                 "Chevereto的API或用户名或密码未设置，请检查chevereto-username/chevereto-password设置"
                             )
                     elif self.image_hosting == ImageHosting.IMGURL:
+                        if self.imgurl_hosting_url.endswith('/'):
+                            self.imgurl_hosting_url = self.imgurl_hosting_url[:-1]
                         img_url = imgurl_upload(
                             img, self.imgurl_hosting_url, self.imgurl_api_key
                         )
                     elif self.image_hosting == ImageHosting.SMMS:
                         img_url = smms_upload(img, self.smms_api_key)
                     elif self.image_hosting == ImageHosting.BYR:
+                        if self.byr_alternative_url and self.byr_alternative_url.endswith('/'):
+                            self.byr_alternative_url = self.byr_alternative_url[:-1]
                         img_url = byr_upload(
                             img, self.byr_authorization, self.byr_alternative_url
                         )
