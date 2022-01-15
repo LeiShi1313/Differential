@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+SUDO=$(if [ $(id -u $whoami) -gt 0 ]; then echo "sudo "; fi)
+
 get_distribution() {
 	lsb_dist=""
 	# Every system that we officially support has /etc/os-release
@@ -66,61 +68,91 @@ do_install() {
 
 	echo $dist_version
     case "$lsb_dist" in
-	    ubuntu|debian|raspbian)
+	    ubuntu | debian | raspbian)
+			$SUDO apt update -qq >/dev/null
 		    pre_reqs="ffmpeg mediainfo zlib1g-dev libjpeg-dev python3 python3-pip"
 
-			sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
 			if [ "$lsb_dist" = "ubuntu" ]; then
 				case "$dist_version" in
 			    	bionic|focal)
-				    	pre_reqs="$pre_reqs gnupg ca-certificates"
+						$SUDO apt install -y -qq gnupg ca-certificates >/dev/null
+						;;
 				esac
-				echo "deb https://download.mono-project.com/repo/ubuntu stable-$dist_version main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
-			else if [ "$lsb_dist" = "debian" ] || [ "$lsb_dist" = "raspbian" ]; then
-			    pre_reqs="$pre_reqs apt-transport-https dirmngr gnupg ca-certificates"
-				echo "deb https://download.mono-project.com/repo/debian stable-$dist_version main" | sudo tee /etc/apt/sources.list.d/mono-official-stable.list
+				$SUDO apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+				echo "deb https://download.mono-project.com/repo/ubuntu stable-$dist_version main" | $SUDO tee /etc/apt/sources.list.d/mono-official-stable.list
+			elif [ "$lsb_dist" = "debian" ] || [ "$lsb_dist" = "raspbian" ]; then
+				$SUDO apt install -y -qq apt-transport-https dirmngr gnupg ca-certificates >/dev/null
+				$SUDO apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+				echo "deb https://download.mono-project.com/repo/debian stable-$dist_version main" | $SUDO tee /etc/apt/sources.list.d/mono-official-stable.list
 			fi
 
 			echo "正在更新安装包..." && \
-			sudo apt update -qq >/dev/null && \
+			$SUDO apt update -qq >/dev/null && \
 			echo "正在安装依赖..." && \
-			sudo apt install -y -qq $pre_reqs >/dev/null && \
+			$SUDO apt install -y -qq $pre_reqs >/dev/null && \
 			echo "正在安装Mono..." && \
-			sudo apt install mono-devel && \
-			echo "正在安装差速器..." && \
-			pip install Differential
-		centos|fedora|rhel)
-			if [ "$lsb_dist" = "fedora" ]; then
-				pre_reqs="ffmpeg mediainfo python3 python3-pip"
-				sudo rpm --import "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
-				if [[ $dist_version -gt 28 ]]; then
-					sudo su -c "curl https://download.mono-project.com/repo/centos8-stable.repo | tee /etc/yum.repos.d/mono-centos8-stable.repo"
-				else
-					sudo su -c 'curl https://download.mono-project.com/repo/centos7-stable.repo | tee /etc/yum.repos.d/mono-centos7-stable.repo'
-				fi
-				pkg_manager="dnf"
+			$SUDO apt install -y mono-devel && \
+			echo "正在安装差速器..."
+			if command_exists pip3; then
+				pip3 install Differential
 			else
+				pip install Differential
+			fi
+			;;
+
+		centos | fedora | rhel)
+			if [ "$lsb_dist" = "fedora" ]; then
+				pkg_manager="dnf"
+				pre_reqs="ffmpeg mediainfo python3 python3-pip"
+
+				$SUDO rpm --import "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
+				if [[ $dist_version -gt 28 ]]; then
+					$SUDO su -c "curl https://download.mono-project.com/repo/centos8-stable.repo | $SUDO tee /etc/yum.repos.d/mono-centos8-stable.repo"
+				else
+					$SUDO su -c "curl https://download.mono-project.com/repo/centos7-stable.repo | $SUDO tee /etc/yum.repos.d/mono-centos7-stable.repo"
+				fi
+				$SUDO $pkg_manager install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+				$SUDO $pkg_manager config-manager --enable PowerTools && dnf install --nogpgcheck && \
+				$SUDO $pkg_manager install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm
+			else
+				pkg_manager="yum"
 				pre_reqs="ffmpeg mediainfo python3 python3-pip"
 
 				case "$dist_version" in
-					7|8)
-						sudo rpmkeys --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
-				case "$dist_version" in 
+					8)
+						$SUDO rpmkeys --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
+						$SUDO $pkg_manager install -y epel-release
+						$SUDO $pkg_manager install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm
+						;;
+					7)
+						pre_reqs="$pre_reqs zlib-devel libjpeg-devel gcc python3-devel"
+						$SUDO rpmkeys --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
+						;;
 					6)
-						sudo rpm --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"	
+						$SUDO rpm --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"	
+						;;
 				esac
-				sudo su -c "curl https://download.mono-project.com/repo/centos$dist_version-stable.repo | tee /etc/yum.repos.d/mono-centos$dist_version-stable.repo"
-				pkg_manager="yum"
+				$SUDO su -c "curl https://download.mono-project.com/repo/centos$dist_version-stable.repo | $SUDO tee /etc/yum.repos.d/mono-centos$dist_version-stable.repo"
 			fi
 
 			echo "正在更新安装包..." && \
-			sudo $pkg_manager update -y -qq > /dev/null && \
+			$SUDO $pkg_manager update -y -qq > /dev/null && \
 			echo "正在安装依赖..." && \
-			sudo $pkg_manager install -y -q $pre_reqs > /dev/null && \
+			$SUDO $pkg_manager install -y -qq $pre_reqs > /dev/null && \
 			echo "正在安装Mono..." && \
-			sudo $pkg_manager install -y mono-devel
-			echo "正在安装差速器..." && \
-			pip install Differential
+			$SUDO $pkg_manager install -y mono-devel && \
+			echo "正在安装差速器..."
+			if command_exists pip3; then
+				pip3 install Differential
+			else
+				pip install Differential
+			fi
+			;;
+
+		*)
+			echo "系统版本 $lsb_dist $dist_version 还未支持！"
+			;;
+
 	esac
 
 	if command_exists dft; then
@@ -128,6 +160,7 @@ do_install() {
 		echo "差速器$dft_version安装成功"
 	else
 		echo "差速器安装失败"
+	fi
 }
 
 do_install
