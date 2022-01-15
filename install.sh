@@ -69,34 +69,53 @@ do_install() {
 	echo $dist_version
     case "$lsb_dist" in
 	    ubuntu | debian | raspbian)
-			$SUDO apt update -qq >/dev/null
+			echo "正在更新依赖..."
+			$SUDO apt-get update -qq >/dev/null
 		    pre_reqs="ffmpeg mediainfo zlib1g-dev libjpeg-dev python3 python3-pip"
 
 			if [ "$lsb_dist" = "ubuntu" ]; then
 				case "$dist_version" in
 			    	bionic|focal)
-						$SUDO apt install -y -qq gnupg ca-certificates >/dev/null
+						$SUDO apt-get install -y -qq gnupg ca-certificates >/dev/null
 						;;
 				esac
 				$SUDO apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
 				echo "deb https://download.mono-project.com/repo/ubuntu stable-$dist_version main" | $SUDO tee /etc/apt/sources.list.d/mono-official-stable.list
 			elif [ "$lsb_dist" = "debian" ] || [ "$lsb_dist" = "raspbian" ]; then
-				$SUDO apt install -y -qq apt-transport-https dirmngr gnupg ca-certificates >/dev/null
+				$SUDO apt-get install -y -qq apt-transport-https dirmngr gnupg ca-certificates >/dev/null
 				$SUDO apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
 				echo "deb https://download.mono-project.com/repo/debian stable-$dist_version main" | $SUDO tee /etc/apt/sources.list.d/mono-official-stable.list
+
+				case "$dist_version" in
+				    stretch|jessie)
+						# TODO: Jessie is haveing some SSL issue
+						# might need to install openssl as well
+						# pip is configured with locations that require TLS/SSL, however the ssl module in Python is not available.
+						echo "正在安装python3.8..."  && \
+						$SUDO apt-get install -y -qq wget build-essential checkinstall libreadline-gplv2-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev libffi-dev zlib1g-dev && \
+						pushd /tmp && \
+						$SUDO wget https://www.python.org/ftp/python/3.8.12/Python-3.8.12.tgz && \
+						$SUDO tar xzf Python-3.8.12.tgz && \
+						cd Python-3.8.12 && \
+						$SUDO ./configure --enable-optimizations > /dev/null && \
+						$SUDO make altinstall
+						;;
+				esac
 			fi
 
 			echo "正在更新安装包..." && \
-			$SUDO apt update -qq >/dev/null && \
+			$SUDO apt-get update -qq >/dev/null && \
 			echo "正在安装依赖..." && \
-			$SUDO apt install -y -qq $pre_reqs >/dev/null && \
+			$SUDO apt-get install -y -qq $pre_reqs >/dev/null && \
 			echo "正在安装Mono..." && \
-			$SUDO apt install -y mono-devel && \
+			$SUDO apt-get install -y -qq mono-devel && \
 			echo "正在安装差速器..."
 			if command_exists pip3; then
 				pip3 install Differential
-			else
+			elif command_exists pip; then
 				pip install Differential
+			elif command_exists pip3.8; then
+				pip3.8 install Differential
 			fi
 			;;
 
