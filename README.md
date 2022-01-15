@@ -17,6 +17,14 @@
 > 也可以到[Telegram群组](https://t.me/ptdft)来讨论各种问题
 
 ## Linux
+
+### 一键脚本安装
+对于`Debian 9+`/`Ubuntu 20.04+`/`Centos 8`/`Fedora 34+`/`Archlinux`，可以使用一键脚本安装
+```shell
+curl -Lso- https://raw.githubusercontent.com/LeiShi1313/Differential/main/install.sh | bash
+```
+
+### 手动安装
 按照[这个](https://www.mono-project.com/download/stable/#download-lin)页面，安装Mono
 
 ```shell
