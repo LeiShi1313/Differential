@@ -74,6 +74,7 @@ do_install() {
 		    pre_reqs="ffmpeg mediainfo zlib1g-dev libjpeg-dev python3 python3-pip"
 
 			if [ "$lsb_dist" = "ubuntu" ]; then
+				# TODO ubuntu:18.04 Cannot install due to pymediainfo error, might need install newer python
 				case "$dist_version" in
 			    	bionic|focal)
 						$SUDO apt-get install -y -qq gnupg ca-certificates >/dev/null
@@ -135,19 +136,28 @@ do_install() {
 				$SUDO $pkg_manager install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm
 			else
 				pkg_manager="yum"
-				pre_reqs="ffmpeg mediainfo python3 python3-pip"
+				pre_reqs="ffmpeg mediainfo python3 python3-pip zlib-devel libjpeg-devel gcc python3-devel"
 
+				$SUDO $pkg_manager install -y -qq epel-release
 				case "$dist_version" in
 					8)
+						echo "Enabling PowerTools" && \
+						$SUDO dnf -y install dnf-plugins-core 2>&1 > /dev/null && \
+						$SUDO dnf upgrade -y 2>&1 > /dev/null && \
+						$SUDO dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
+						$SUDO dnf config-manager --set-enabled powertools && \
+						$SUDO dnf -y install mediainfo 2>&1 > /dev/null
 						$SUDO rpmkeys --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
-						$SUDO $pkg_manager install -y epel-release
 						$SUDO $pkg_manager install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm
 						;;
 					7)
-						pre_reqs="$pre_reqs zlib-devel libjpeg-devel gcc python3-devel"
+						$SUDO rpm --import http://li.nux.ro/download/nux/RPM-GPG-KEY-nux.ro
+						$SUDO rpm -Uvh http://li.nux.ro/download/nux/dextop/el7/x86_64/nux-dextop-release-0-5.el7.nux.noarch.rpm
 						$SUDO rpmkeys --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
 						;;
 					6)
+						$SUDO rpm --import http://li.nux.ro/download/nux/RPM-GPG-KEY-nux.ro
+						$SUDO rpm -Uvh http://li.nux.ro/download/nux/dextop/el6/x86_64/nux-dextop-release-0-2.el6.nux.noarch.rpm
 						$SUDO rpm --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"	
 						;;
 				esac
@@ -167,7 +177,13 @@ do_install() {
 				pip install Differential
 			fi
 			;;
-
+		arch)
+			echo "正在安装依赖..." && \
+			$SUDO pacman -Sy --noconfirm vlc python3 python-pip mediainfo 2>&1 > /dev/null
+			# TODO cleanup ffmpeg ?
+			echo "正在安装差速器..." && \
+			pip install Differential
+			;;
 		*)
 			echo "系统版本 $lsb_dist $dist_version 还未支持！"
 			;;
