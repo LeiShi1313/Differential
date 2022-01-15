@@ -1,5 +1,5 @@
 loguru==0.5.3
-Pillow==8.3.2
+Pillow==9.0.0
 pymediainfo==5.1.0
-requests==2.26.0
+requests
 torf==3.1.3
