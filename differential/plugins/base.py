@@ -48,6 +48,7 @@ PARSER.add_argument(
     action="version",
     version=f"Differential {version}",
 )
+PARSER.add_argument("--section", default="", help="指定config的section，差速器配置会依次从默认、插件默认和指定section读取并覆盖")
 subparsers = PARSER.add_subparsers(help="使用下列插件名字来查看插件的详细用法")
 REGISTERED_PLUGINS = {}
 
@@ -400,26 +401,35 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     def _get_bdinfo(self) -> str:
         logger.info("目标为BDMV，正在扫描BDInfo...")
-        temp_dir = tempfile.mkdtemp()
+        for f in Path(tempfile.gettempdir()).glob("Differential.bdinfo.*"):
+            if f.is_dir() and self.folder.name in f.name:
+                if list(f.glob("*.txt")):
+                    temp_dir = f.absolute()
+                    logger.info("发现已生成的BDInfo，跳过扫描BDInfo...".format(self.screenshot_count))
+                    break
+        else:
+            temp_dir = temp_dir = tempfile.mkdtemp(
+                prefix="Differential.bdinfo.{}.".format(version), suffix=self.folder.name
+            )
+            for f in self.folder.glob("**/BDMV"):
+                logger.info(f"正在扫描{f.parent}...")
+                if platform.system() == "Windows":
+                    execute_with_output(
+                        os.path.join(
+                            os.path.dirname(tools.__file__), "BDinfoCli.0.7.3\BDInfo.exe"
+                        ),
+                        f'-w "{f.parent}" {temp_dir}',
+                        abort=True,
+                    )
+                else:
+                    execute_with_output(
+                        "mono",
+                        f""""{os.path.join(os.path.dirname(tools.__file__), 'BDinfoCli.0.7.3/BDInfo.exe')}" -w """
+                        f'"{f.parent}" {temp_dir}',
+                        abort=True,
+                    )
         bdinfos = []
-        for f in self.folder.glob("**/BDMV"):
-            logger.info(f"正在扫描{f.parent}...")
-            if platform.system() == "Windows":
-                execute_with_output(
-                    os.path.join(
-                        os.path.dirname(tools.__file__), "BDinfoCli.0.7.3\BDInfo.exe"
-                    ),
-                    f'-w "{f.parent}" {temp_dir}',
-                    abort=True,
-                )
-            else:
-                execute_with_output(
-                    "mono",
-                    f""""{os.path.join(os.path.dirname(tools.__file__), 'BDinfoCli.0.7.3/BDInfo.exe')}" -w """
-                    f'"{f.parent}" {temp_dir}',
-                    abort=True,
-                )
-        for info in Path(temp_dir).glob("*.txt"):
+        for info in sorted(Path(temp_dir).glob("*.txt")):
             with info.open("r") as f:
                 content = f.read()
             if self.use_short_bdinfo:
@@ -433,7 +443,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 )
                 if m:
                     bdinfos.append(m.groups()[0])
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        # shutil.rmtree(temp_dir, ignore_errors=True)
         return "\n\n".join(bdinfos)
 
     def _find_mediainfo(self) -> MediaInfo:
@@ -489,7 +499,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
         temp_dir = None
         # 查找已有的截图
-        for f in Path(tempfile.gettempdir()).glob("Differential*"):
+        for f in Path(tempfile.gettempdir()).glob("Differential.screenshots.*"):
             if f.is_dir() and self.folder.name in f.name:
                 if (
                     self.screenshot_count > 0
@@ -500,7 +510,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                     break
         else:
             temp_dir = tempfile.mkdtemp(
-                prefix="Differential.{}.".format(version), suffix=self.folder.name
+                prefix="Differential.screenshots.{}.".format(version), suffix=self.folder.name
             )
             # 生成截图
             for i in range(1, self.screenshot_count + 1):

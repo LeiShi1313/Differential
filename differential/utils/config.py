@@ -4,7 +4,7 @@ from configparser import RawConfigParser
 from differential.constants import ImageHosting, BOOLEAN_ARGS, BOOLEAN_STATES
 
 
-def merge_config(args: argparse.Namespace) -> dict:
+def merge_config(args: argparse.Namespace, section: str = '') -> dict:
     merged = {}
     config = None
     if hasattr(args, 'config'):
@@ -20,6 +20,13 @@ def merge_config(args: argparse.Namespace) -> dict:
         if args.plugin in config.sections():
             for arg in config[args.plugin].keys():
                 merged[arg] = config[args.plugin][arg]
+
+        if section:
+            if section not in config.sections():
+                logger.warning(f"Section {section} not found in config! Skipping...")
+            else:
+                for arg in config[section].keys():
+                    merged[arg] = config[section][arg]
 
     # Args from command line has the highest priority
     for arg in vars(args):

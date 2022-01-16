@@ -11,7 +11,7 @@ from differential.plugins.base import PARSER, REGISTERED_PLUGINS
 def main():
     args = PARSER.parse_args()
     logger.info("Differential 差速器 {}".format(version))
-    config = merge_config(args)
+    config = merge_config(args, args.section)
 
     if 'log' in config:
         log = config.pop('log')
