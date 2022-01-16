@@ -5,6 +5,8 @@ from typing import Optional
 import requests
 from loguru import logger
 
+from differential.utils.image import ImageUploaded
+
 
 def byr_upload(img: Path, authorization: str, url: Optional[str] = None) -> Optional[str]:
     headers = {'authorization': f'{authorization if authorization.startswith("Basic") else "Basic "+authorization}'}
@@ -25,4 +27,4 @@ def byr_upload(img: Path, authorization: str, url: Optional[str] = None) -> Opti
         logger.trace(req.content)
         logger.warning(f"图片直链获取失败")
         return None
-    return m.groups()[0]
+    return ImageUploaded(m.groups()[0])

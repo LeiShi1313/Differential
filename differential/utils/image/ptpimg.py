@@ -5,6 +5,7 @@ from typing import Optional
 import requests
 from loguru import logger
 
+from differential.utils.image import ImageUploaded
 
 def ptpimg_upload(img: Path, api_key: str) -> Optional[str]:
     data = {'api_key': api_key}
@@ -24,4 +25,4 @@ def ptpimg_upload(img: Path, api_key: str) -> Optional[str]:
     if len(res) < 1 or 'code' not in res[0] or 'ext' not in res[0]:
         logger.warning(f"图片直链获取失败")
         return None
-    return f"https://ptpimg.me/{res[0].get('code')}.{res[0].get('ext')}"
+    return ImageUploaded(f"https://ptpimg.me/{res[0].get('code')}.{res[0].get('ext')}")

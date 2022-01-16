@@ -171,7 +171,7 @@ class CHDBitsEncode(CHDBits):
             "该下载内容仅做宽带测试使用，请在下载后24小时内删除。请购买正版！[/b][/color][/quote]".format(
                 self._ptgen.get("format"),
                 self.media_info + "\n\n" + self.parsed_encoder_log,
-                "\n".join([f"[img]{url}[/img]" for url in self._screenshots]),
+                "\n".join([f"{uploaded}" for uploaded in self._screenshots]),
             )
         )
 

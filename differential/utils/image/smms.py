@@ -5,6 +5,8 @@ from typing import Optional
 import requests
 from loguru import logger
 
+from differential.utils.image import ImageUploaded
+
 
 def smms_upload(img: Path, api_key: str) -> Optional[str]:
     data = {'Authorization': api_key}
@@ -30,4 +32,4 @@ def smms_upload(img: Path, api_key: str) -> Optional[str]:
     if 'data' not in res or 'url' not in res['data']:
         logger.warning(f"图片直链获取失败")
         return None
-    return res['data']['url']
+    return ImageUploaded(res['data']['url'])

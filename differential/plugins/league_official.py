@@ -129,6 +129,6 @@ class LeagueOfficial(LemonHD):
                 GROUP_QUOTES.get(self.team, ''),
                 self._ptgen.get("format"),
                 self.media_info,
-                "\n".join([f"[img]{url}[/img]" for url in self._screenshots]),
+                "\n".join([f"{uploaded}" for uploaded in self._screenshots]),
             )
         )

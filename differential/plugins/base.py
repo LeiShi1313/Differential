@@ -31,14 +31,15 @@ from differential.utils.mediainfo import (
     get_duration,
 )
 from differential.utils.image import (
+    ImageUploaded,
     byr_upload,
+    hdbits_upload,
     ptpimg_upload,
     smms_upload,
     imgurl_upload,
     chevereto_api_upload,
     chevereto_username_upload,
 )
-
 
 PARSER = argparse.ArgumentParser(description="Differential - 差速器 PT快速上传工具")
 PARSER.add_argument(
@@ -159,6 +160,18 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             default=argparse.SUPPRESS,
         )
         parser.add_argument(
+            "--hdbits-cookie",
+            type=str,
+            help="HDBits的Cookie",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--hdbits-thumb-size",
+            type=str,
+            help="HDBits图床缩略图的大小，默认w300",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
             "--chevereto-hosting-url",
             type=str,
             help="自建chevereto图床的地址",
@@ -246,35 +259,37 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         return parser
 
     def __init__(
-        self,
-        folder: str,
-        url: str,
-        upload_url: str,
-        screenshot_count: int = 0,
-        optimize_screenshot: bool = True,
-        use_short_bdinfo: bool = False,
-        image_hosting: ImageHosting = ImageHosting.PTPIMG,
-        chevereto_hosting_url: str = "",
-        imgurl_hosting_url: str = "",
-        ptpimg_api_key: str = None,
-        chevereto_api_key: str = None,
-        chevereto_username: str = None,
-        chevereto_password: str = None,
-        imgurl_api_key: str = None,
-        smms_api_key: str = None,
-        byr_authorization: str = None,
-        byr_alternative_url: str = None,
-        ptgen_url: str = "https://ptgen.lgto.workers.dev",
-        announce_url: str = "https://example.com",
-        ptgen_retry: int = 3,
-        generate_nfo: bool = False,
-        make_torrent: bool = False,
-        easy_upload: bool = False,
-        auto_feed: bool = False,
-        trim_description: bool = False,
-        use_short_url: bool = False,
-        encoder_log: str = "",
-        **kwargs,
+            self,
+            folder: str,
+            url: str,
+            upload_url: str,
+            screenshot_count: int = 0,
+            optimize_screenshot: bool = True,
+            use_short_bdinfo: bool = False,
+            image_hosting: ImageHosting = ImageHosting.PTPIMG,
+            chevereto_hosting_url: str = "",
+            imgurl_hosting_url: str = "",
+            ptpimg_api_key: str = None,
+            hdbits_cookie: str = None,
+            hdbits_thumb_size: str = 'w300',
+            chevereto_api_key: str = None,
+            chevereto_username: str = None,
+            chevereto_password: str = None,
+            imgurl_api_key: str = None,
+            smms_api_key: str = None,
+            byr_authorization: str = None,
+            byr_alternative_url: str = None,
+            ptgen_url: str = "https://ptgen.lgto.workers.dev",
+            announce_url: str = "https://example.com",
+            ptgen_retry: int = 3,
+            generate_nfo: bool = False,
+            make_torrent: bool = False,
+            easy_upload: bool = False,
+            auto_feed: bool = False,
+            trim_description: bool = False,
+            use_short_url: bool = False,
+            encoder_log: str = "",
+            **kwargs,
     ):
         self.folder = Path(folder)
         self.url = url
@@ -286,6 +301,8 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.chevereto_hosting_url = chevereto_hosting_url
         self.imgurl_hosting_url = imgurl_hosting_url
         self.ptpimg_api_key = ptpimg_api_key
+        self.hdbits_cookie = hdbits_cookie
+        self.hdbits_thumb_size = hdbits_thumb_size
         self.chevereto_username = chevereto_username
         self.chevereto_password = chevereto_password
         self.chevereto_api_key = chevereto_api_key
@@ -314,62 +331,79 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     def upload_screenshots(self, img_dir: str) -> list:
         img_urls = []
-        for count, img in enumerate(sorted(Path(img_dir).glob("*.png"))):
-            if img.is_file():
-                img_url = None
-                img_url_file = img.resolve().parent.joinpath(
-                    ".{}.{}".format(self.image_hosting.value, img.stem)
-                )
-                if img_url_file.is_file():
-                    with open(img_url_file, "r") as f:
-                        img_url = f.read().strip()
-                        logger.info(f"发现已上传的第{count + 1}张截图链接：{img_url}")
-                else:
-                    if self.image_hosting == ImageHosting.PTPIMG:
-                        img_url = ptpimg_upload(img, self.ptpimg_api_key)
-                    elif self.image_hosting == ImageHosting.CHEVERETO:
-                        if not self.chevereto_hosting_url:
-                            logger.error("Chevereto地址未提供，请设置chevereto_hosting_url")
-                            sys.exit(1)
-                        if self.chevereto_hosting_url.endswith('/'):
-                            self.chevereto_hosting_url = self.chevereto_hosting_url[:-1]
-                        if self.chevereto_api_key:
-                            img_url = chevereto_api_upload(
-                                img, self.chevereto_hosting_url, self.chevereto_api_key
+        if self.image_hosting == ImageHosting.HDB:
+            img_urls_file = Path(img_dir).joinpath(".{}.{}".format(self.image_hosting.value, self.folder.name))
+            if img_urls_file.is_file():
+                _img_urls = []
+                with open(img_urls_file, 'r') as f:
+                    for line in f.readlines():
+                        url, thumb = line.split(' ')
+                        _img_urls.append(ImageUploaded(url, thumb))
+                if len(_img_urls) == len(list(Path(img_dir).glob("*.png"))):
+                    logger.info(f"发现已上传的{len(_img_urls)}张截图链接")
+                    return _img_urls
+            img_urls = hdbits_upload(sorted(Path(img_dir).glob("*.png")), self.hdbits_cookie, self.folder.name, self.hdbits_thumb_size)
+            if not img_urls:
+                logger.info("HDBits图床上传失败，请自行上传截图：{}".format(img_dir))
+            with open(img_urls_file, 'w') as f:
+                for img_url in img_urls:
+                    f.write(f"{img_url.url} {img_url.thumb}\n")
+        else:
+            for count, img in enumerate(sorted(Path(img_dir).glob("*.png"))):
+                if img.is_file():
+                    img_url = None
+                    img_url_file = img.resolve().parent.joinpath(
+                        ".{}.{}".format(self.image_hosting.value, img.stem)
+                    )
+                    if img_url_file.is_file():
+                        with open(img_url_file, "r") as f:
+                            img_url = f.read().strip()
+                            logger.info(f"发现已上传的第{count + 1}张截图链接：{img_url}")
+                    else:
+                        if self.image_hosting == ImageHosting.PTPIMG:
+                            img_url = ptpimg_upload(img, self.ptpimg_api_key)
+                        elif self.image_hosting == ImageHosting.CHEVERETO:
+                            if not self.chevereto_hosting_url:
+                                logger.error("Chevereto地址未提供，请设置chevereto_hosting_url")
+                                sys.exit(1)
+                            if self.chevereto_hosting_url.endswith('/'):
+                                self.chevereto_hosting_url = self.chevereto_hosting_url[:-1]
+                            if self.chevereto_api_key:
+                                img_url = chevereto_api_upload(
+                                    img, self.chevereto_hosting_url, self.chevereto_api_key
+                                )
+                            elif self.chevereto_username and self.chevereto_password:
+                                img_url = chevereto_username_upload(
+                                    img,
+                                    self.chevereto_hosting_url,
+                                    self.chevereto_username,
+                                    self.chevereto_password,
+                                )
+                            else:
+                                logger.error(
+                                    "Chevereto的API或用户名或密码未设置，请检查chevereto-username/chevereto-password设置"
+                                )
+                        elif self.image_hosting == ImageHosting.IMGURL:
+                            if self.imgurl_hosting_url.endswith('/'):
+                                self.imgurl_hosting_url = self.imgurl_hosting_url[:-1]
+                            img_url = imgurl_upload(
+                                img, self.imgurl_hosting_url, self.imgurl_api_key
                             )
-                        elif self.chevereto_username and self.chevereto_password:
-                            img_url = chevereto_username_upload(
-                                img,
-                                self.chevereto_hosting_url,
-                                self.chevereto_username,
-                                self.chevereto_password,
+                        elif self.image_hosting == ImageHosting.SMMS:
+                            img_url = smms_upload(img, self.smms_api_key)
+                        elif self.image_hosting == ImageHosting.BYR:
+                            if self.byr_alternative_url and self.byr_alternative_url.endswith('/'):
+                                self.byr_alternative_url = self.byr_alternative_url[:-1]
+                            img_url = byr_upload(
+                                img, self.byr_authorization, self.byr_alternative_url
                             )
-                        else:
-                            logger.error(
-                                "Chevereto的API或用户名或密码未设置，请检查chevereto-username/chevereto-password设置"
-                            )
-                    elif self.image_hosting == ImageHosting.IMGURL:
-                        if self.imgurl_hosting_url.endswith('/'):
-                            self.imgurl_hosting_url = self.imgurl_hosting_url[:-1]
-                        img_url = imgurl_upload(
-                            img, self.imgurl_hosting_url, self.imgurl_api_key
-                        )
-                    elif self.image_hosting == ImageHosting.SMMS:
-                        img_url = smms_upload(img, self.smms_api_key)
-                    elif self.image_hosting == ImageHosting.BYR:
-                        if self.byr_alternative_url and self.byr_alternative_url.endswith('/'):
-                            self.byr_alternative_url = self.byr_alternative_url[:-1]
-                        img_url = byr_upload(
-                            img, self.byr_authorization, self.byr_alternative_url
-                        )
-
-                if img_url:
-                    logger.info(f"第{count + 1}张截图地址：{img_url}")
-                    with open(img_url_file, "w") as f:
-                        f.write(img_url)
-                    img_urls.append(img_url)
-                else:
-                    logger.info(f"第{count + 1}张截图上传失败，请自行上传：{img.resolve()}")
+                    if img_url:
+                        logger.info(f"第{count + 1}张截图地址：{img_url}")
+                        with open(img_url_file, "w") as f:
+                            f.write(img_url)
+                        img_urls.append(img_url)
+                    else:
+                        logger.info(f"第{count + 1}张截图上传失败，请自行上传：{img.resolve()}")
         return img_urls
 
     def _get_ptgen(self) -> dict:
@@ -484,7 +518,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         logger.info("正在生成nfo文件...")
         if self.folder.is_file():
             with open(
-                f"{self.folder.resolve().parent.joinpath(self.folder.stem)}.nfo", "wb"
+                    f"{self.folder.resolve().parent.joinpath(self.folder.stem)}.nfo", "wb"
             ) as f:
                 f.write(self.media_info.encode())
         elif self.folder.is_dir():
@@ -499,18 +533,17 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
         temp_dir = None
         # 查找已有的截图
-        for f in Path(tempfile.gettempdir()).glob("Differential.screenshots.*"):
+        for f in Path(tempfile.gettempdir()).glob("Differential.screenshots.{}.*".format(self.image_hosting.value)):
             if f.is_dir() and self.folder.name in f.name:
                 if (
-                    self.screenshot_count > 0
-                    and len(list(f.glob("*.png"))) == self.screenshot_count
+                        0 < self.screenshot_count == len(list(f.glob("*.png")))
                 ):
                     temp_dir = f.absolute()
                     logger.info("发现已生成的{}张截图，跳过截图...".format(self.screenshot_count))
                     break
         else:
             temp_dir = tempfile.mkdtemp(
-                prefix="Differential.screenshots.{}.".format(version), suffix=self.folder.name
+                prefix="Differential.screenshots.{}.{}.".format(self.image_hosting.value, version), suffix=self.folder.name
             )
             # 生成截图
             for i in range(1, self.screenshot_count + 1):
@@ -614,7 +647,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             self._ptgen.get("format"),
             self.media_info,
             "\n\n" + self.parsed_encoder_log if self.parsed_encoder_log else "",
-            "\n".join([f"[img]{url}[/img]" for url in self._screenshots]),
+            "\n".join([f"{uploaded}" for uploaded in self._screenshots]),
         )
 
     @property
@@ -637,7 +670,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def screenshots(self):
-        return self._screenshots
+        return [u.url for u in self._screenshots]
 
     @property
     def poster(self):
@@ -650,7 +683,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     @property
     def category(self):
         if "演唱会" in self._ptgen.get("tags", []) and "音乐" in self._ptgen.get(
-            "genre", []
+                "genre", []
         ):
             return "concert"
         imdb_genre = self._imdb.get("genre", [])
@@ -674,7 +707,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         elif any(e in self.folder.name.lower() for e in ("x264", "x265")):
             return "encode"
         elif "bluray" in self.folder.name.lower() and not any(
-            e in self.folder.name.lower() for e in ("x264", "x265")
+                e in self.folder.name.lower() for e in ("x264", "x265")
         ):
             return "bluray"
         elif "uhd" in self.folder.name.lower():

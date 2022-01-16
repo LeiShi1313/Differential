@@ -6,6 +6,8 @@ from typing import Optional
 import requests
 from loguru import logger
 
+from differential.utils.image import ImageUploaded
+
 sessions = {}
 
 
@@ -31,7 +33,7 @@ def chevereto_api_upload(img: Path, url: str, api_key: str) -> Optional[str]:
     if 'image' not in res or 'url' not in res['image']:
         logger.warning(f"图片直链获取失败")
         return None
-    return res['image']['url']
+    return ImageUploaded(res['image']['url'])
 
 
 def chevereto_cookie_upload(img: Path, url: str, cookie: str, auth_token: str) -> Optional[str]:
@@ -60,7 +62,7 @@ def chevereto_cookie_upload(img: Path, url: str, cookie: str, auth_token: str) -
     if 'image' not in res or 'url' not in res['image']:
         logger.warning(f"图片直链获取失败")
         return None
-    return res['image']['url']
+    return ImageUploaded(res['image']['url'])
 
 
 def with_session(func):
@@ -112,4 +114,4 @@ def chevereto_username_upload(session: requests.Session, img: Path, url: str, au
     if 'image' not in res or 'url' not in res['image']:
         logger.warning(f"图片直链获取失败")
         return None
-    return res['image']['url']
+    return ImageUploaded(res['image']['url'])

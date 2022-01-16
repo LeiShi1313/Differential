@@ -5,6 +5,7 @@ from typing import Optional
 import requests
 from loguru import logger
 
+from differential.utils.image import ImageUploaded
 
 def imgurl_upload(img: Path, url: str, api_key: str) -> Optional[str]:
     data = {'token': api_key}
@@ -25,4 +26,4 @@ def imgurl_upload(img: Path, url: str, api_key: str) -> Optional[str]:
     if res.get('code') > 200:
         logger.warning(f"上传图片失败: [{res.get('code')}]{res.get('msg')}")
         return None
-    return res.get('url')
+    return ImageUploaded(res.get('url'))
