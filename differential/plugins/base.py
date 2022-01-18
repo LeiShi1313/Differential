@@ -144,7 +144,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         parser.add_argument(
             "--no-scan-bdinfo",
             action="store_false",
-            dest="scan_bdinfo"
+            dest="scan_bdinfo",
             help="如果为原盘，跳过扫描BDInfo",
             default=argparse.SUPPRESS,
         )
