@@ -4,3 +4,4 @@ pymediainfo==5.1.0
 requests
 torf==3.1.3
 lxml==4.7.1
+bencode.py==4.0.0

@@ -7,7 +7,7 @@ from loguru import logger
 
 from differential.utils.image import ImageUploaded
 
-def ptpimg_upload(img: Path, api_key: str) -> Optional[str]:
+def ptpimg_upload(img: Path, api_key: str) -> Optional[ImageUploaded]:
     data = {'api_key': api_key}
     files = {'file-upload[0]': open(img, 'rb')}
     req = requests.post('https://ptpimg.me/upload.php', data=data, files=files)

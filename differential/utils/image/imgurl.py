@@ -7,7 +7,7 @@ from loguru import logger
 
 from differential.utils.image import ImageUploaded
 
-def imgurl_upload(img: Path, url: str, api_key: str) -> Optional[str]:
+def imgurl_upload(img: Path, url: str, api_key: str) -> Optional[ImageUploaded]:
     data = {'token': api_key}
     files = {'file': open(img, 'rb')}
     req = requests.post(f'{url}/api/upload', data=data, files=files)

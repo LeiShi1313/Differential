@@ -8,7 +8,7 @@ from loguru import logger
 from differential.utils.image import ImageUploaded
 
 
-def byr_upload(img: Path, authorization: str, url: Optional[str] = None) -> Optional[str]:
+def byr_upload(img: Path, authorization: str, url: Optional[str] = None) -> Optional[ImageUploaded]:
     headers = {'authorization': f'{authorization if authorization.startswith("Basic") else "Basic "+authorization}'}
     params = {'command': 'QuickUpload', 'type': 'Images', 'CKEditor': 'descr', 'CKEditorFuncNum': 2}
     files = {'upload': open(img, 'rb')}

@@ -142,6 +142,13 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             default=argparse.SUPPRESS,
         )
         parser.add_argument(
+            "--no-scan-bdinfo",
+            action="store_false",
+            dest="scan_bdinfo"
+            help="如果为原盘，跳过扫描BDInfo",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
             "--optimize-screenshot",
             action="store_true",
             help="是否压缩截图（无损），默认压缩",
@@ -256,6 +263,19 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             help="是否缩短生成的上传链接",
             default=argparse.SUPPRESS,
         )
+        parser.add_argument(
+            "--no-reuse-torrent",
+            action="store_false",
+            dest="reuse_torrent",
+            help="是否直接在差速器已经制作的种子基础上重新制种",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--from-torrent",
+            type=str,
+            help="提供种子，在此基础上，直接洗种生成新种子",
+            default=argparse.SUPPRESS,
+        )
         return parser
 
     def __init__(
@@ -266,6 +286,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             screenshot_count: int = 0,
             optimize_screenshot: bool = True,
             use_short_bdinfo: bool = False,
+            scan_bdinfo: bool = True,
             image_hosting: ImageHosting = ImageHosting.PTPIMG,
             chevereto_hosting_url: str = "",
             imgurl_hosting_url: str = "",
@@ -289,6 +310,8 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             trim_description: bool = False,
             use_short_url: bool = False,
             encoder_log: str = "",
+            reuse_torrent: bool = True,
+            from_torrent: str = None,
             **kwargs,
     ):
         self.folder = Path(folder)
@@ -297,6 +320,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.screenshot_count = screenshot_count
         self.optimize_screenshot = optimize_screenshot
         self.use_short_bdinfo = use_short_bdinfo
+        self.scan_bdinfo = scan_bdinfo
         self.image_hosting = image_hosting
         self.chevereto_hosting_url = chevereto_hosting_url
         self.imgurl_hosting_url = imgurl_hosting_url
@@ -320,6 +344,8 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.trim_description = trim_description
         self.use_short_url = use_short_url
         self.encoder_log = encoder_log
+        self.reuse_torrent = reuse_torrent
+        self.from_torrent = from_torrent
 
         self.is_bdmv = False
         self._bdinfo = None
@@ -357,7 +383,11 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                     )
                     if img_url_file.is_file():
                         with open(img_url_file, "r") as f:
-                            img_url = f.read().strip()
+                            line = f.read().strip()
+                            if len(line.split(' ')) > 1:
+                                img_url = ImageUploaded(line.split(' ')[0], line.split(' ')[1])
+                            else:
+                                img_url = ImageUploaded(line)
                             logger.info(f"发现已上传的第{count + 1}张截图链接：{img_url}")
                     else:
                         if self.image_hosting == ImageHosting.PTPIMG:
@@ -400,7 +430,10 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                     if img_url:
                         logger.info(f"第{count + 1}张截图地址：{img_url}")
                         with open(img_url_file, "w") as f:
-                            f.write(img_url)
+                            if img_url.thumb:
+                                f.write(f"{img_url.url} {img_url.thumb}")
+                            else:
+                                f.write(f"{img_url.url}")
                         img_urls.append(img_url)
                     else:
                         logger.info(f"第{count + 1}张截图上传失败，请自行上传：{img.resolve()}")
@@ -434,51 +467,55 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         return req.json()
 
     def _get_bdinfo(self) -> str:
-        logger.info("目标为BDMV，正在扫描BDInfo...")
-        for f in Path(tempfile.gettempdir()).glob("Differential.bdinfo.*"):
-            if f.is_dir() and self.folder.name in f.name:
-                if list(f.glob("*.txt")):
-                    temp_dir = f.absolute()
-                    logger.info("发现已生成的BDInfo，跳过扫描BDInfo...".format(self.screenshot_count))
-                    break
+        if not self.scan_bdinfo:
+            logger.info("目标为BDMV，跳过扫描BDInfo")
+            return "[BDINFO HERE]"
         else:
-            temp_dir = temp_dir = tempfile.mkdtemp(
-                prefix="Differential.bdinfo.{}.".format(version), suffix=self.folder.name
-            )
-            for f in self.folder.glob("**/BDMV"):
-                logger.info(f"正在扫描{f.parent}...")
-                if platform.system() == "Windows":
-                    execute_with_output(
-                        os.path.join(
-                            os.path.dirname(tools.__file__), "BDinfoCli.0.7.3\BDInfo.exe"
-                        ),
-                        f'-w "{f.parent}" {temp_dir}',
-                        abort=True,
-                    )
-                else:
-                    execute_with_output(
-                        "mono",
-                        f""""{os.path.join(os.path.dirname(tools.__file__), 'BDinfoCli.0.7.3/BDInfo.exe')}" -w """
-                        f'"{f.parent}" {temp_dir}',
-                        abort=True,
-                    )
-        bdinfos = []
-        for info in sorted(Path(temp_dir).glob("*.txt")):
-            with info.open("r") as f:
-                content = f.read()
-            if self.use_short_bdinfo:
-                m = re.search(r"(QUICK SUMMARY:\n+(.+?\n)+)\n\n", content)
-                if m:
-                    bdinfos.append(m.groups()[0])
+            logger.info("目标为BDMV，正在扫描BDInfo...")
+            for f in Path(tempfile.gettempdir()).glob("Differential.bdinfo.*"):
+                if f.is_dir() and self.folder.name in f.name:
+                    if list(f.glob("*.txt")):
+                        temp_dir = f.absolute()
+                        logger.info("发现已生成的BDInfo，跳过扫描BDInfo...".format(self.screenshot_count))
+                        break
             else:
-                m = re.search(
-                    r"(DISC INFO:\n+(.+?\n{1,2})+?)(?:CHAPTERS:\n|STREAM DIAGNOSTICS:\n|\[\/code\]\n<---- END FORUMS PASTE ---->)",
-                    content,
+                temp_dir = temp_dir = tempfile.mkdtemp(
+                    prefix="Differential.bdinfo.{}.".format(version), suffix=self.folder.name
                 )
-                if m:
-                    bdinfos.append(m.groups()[0])
-        # shutil.rmtree(temp_dir, ignore_errors=True)
-        return "\n\n".join(bdinfos)
+                for f in self.folder.glob("**/BDMV"):
+                    logger.info(f"正在扫描{f.parent}...")
+                    if platform.system() == "Windows":
+                        execute_with_output(
+                            os.path.join(
+                                os.path.dirname(tools.__file__), "BDinfoCli.0.7.3\BDInfo.exe"
+                            ),
+                            f'-w "{f.parent}" "{temp_dir}"',
+                            abort=True,
+                        )
+                    else:
+                        execute_with_output(
+                            "mono",
+                            f""""{os.path.join(os.path.dirname(tools.__file__), 'BDinfoCli.0.7.3/BDInfo.exe')}" -w """
+                            f'"{f.parent}" "{temp_dir}"',
+                            abort=True,
+                        )
+            bdinfos = []
+            for info in sorted(Path(temp_dir).glob("*.txt")):
+                with info.open("r") as f:
+                    content = f.read()
+                if self.use_short_bdinfo:
+                    m = re.search(r"(QUICK SUMMARY:\n+(.+?\n)+)\n\n", content)
+                    if m:
+                        bdinfos.append(m.groups()[0])
+                else:
+                    m = re.search(
+                        r"(DISC INFO:\n+(.+?\n{1,2})+?)(?:CHAPTERS:\n|STREAM DIAGNOSTICS:\n|\[\/code\]\n<---- END FORUMS PASTE ---->)",
+                        content,
+                    )
+                    if m:
+                        bdinfos.append(m.groups()[0])
+            # shutil.rmtree(temp_dir, ignore_errors=True)
+            return "\n\n".join(bdinfos)
 
     def _find_mediainfo(self) -> MediaInfo:
         # Always find the biggest file in the folder
@@ -593,7 +630,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             self._generate_nfo()
         self._screenshots = self._get_screenshots()
         if self.make_torrent:
-            make_torrent(self.folder, [self.announce_url])
+            make_torrent(self.folder, self.announce_url, self.__class__.__name__, self.reuse_torrent, self.from_torrent)
 
     @property
     def parsed_encoder_log(self):

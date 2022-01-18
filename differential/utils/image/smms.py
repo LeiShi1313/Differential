@@ -8,7 +8,7 @@ from loguru import logger
 from differential.utils.image import ImageUploaded
 
 
-def smms_upload(img: Path, api_key: str) -> Optional[str]:
+def smms_upload(img: Path, api_key: str) -> Optional[ImageUploaded]:
     data = {'Authorization': api_key}
     files = {'smfile': open(img, 'rb'), 'format': 'json'}
     req = requests.post('https://sm.ms/api/v2/upload', data=data, files=files)

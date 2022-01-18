@@ -4,7 +4,7 @@ from enum import Enum
 BOOLEAN_STATES = {'1': True, 'yes': True, 'true': True, 'on': True,
                   '0': False, 'no': False, 'false': False, 'off': False}
 
-BOOLEAN_ARGS = ('generate_nfo', 'make_torrent', 'easy_upload', 'trim_description', 'combine_screenshots', 'use_short_bdinfo', 'use_short_url')
+BOOLEAN_ARGS = ('generate_nfo', 'make_torrent', 'easy_upload', 'trim_description', 'combine_screenshots', 'use_short_bdinfo', 'use_short_url', 'reuse_torrent')
 
 URL_SHORTENER_PATH = 'https://lg.to'
 

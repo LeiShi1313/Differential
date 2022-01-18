@@ -11,7 +11,7 @@ from differential.utils.image import ImageUploaded
 sessions = {}
 
 
-def chevereto_api_upload(img: Path, url: str, api_key: str) -> Optional[str]:
+def chevereto_api_upload(img: Path, url: str, api_key: str) -> Optional[ImageUploaded]:
     data = {'key': api_key}
     files = {'source': open(img, 'rb')}
     req = requests.post(f'{url}/api/1/upload', data=data, files=files)
@@ -36,7 +36,7 @@ def chevereto_api_upload(img: Path, url: str, api_key: str) -> Optional[str]:
     return ImageUploaded(res['image']['url'])
 
 
-def chevereto_cookie_upload(img: Path, url: str, cookie: str, auth_token: str) -> Optional[str]:
+def chevereto_cookie_upload(img: Path, url: str, cookie: str, auth_token: str) -> Optional[ImageUploaded]:
     headers = {'cookie': cookie}
     data = {'type': 'file', 'action': 'upload', 'nsfw': 0, 'auth_token': auth_token}
     files = {'source': open(img, 'rb')}
@@ -89,7 +89,7 @@ def with_session(func):
 
 
 @with_session
-def chevereto_username_upload(session: requests.Session, img: Path, url: str, auth_token: str) -> Optional[str]:
+def chevereto_username_upload(session: requests.Session, img: Path, url: str, auth_token: str) -> Optional[ImageUploaded]:
     data = {'type': 'file', 'action': 'upload', 'nsfw': 0, 'auth_token': auth_token}
     files = {'source': open(img, 'rb')}
     req = session.post(f'{url}/json', data=data, files=files)

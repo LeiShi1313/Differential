@@ -22,7 +22,7 @@ def get_uploadid(cookie: str) -> str:
 
 def hdbits_upload(
     imgs: List[Path], cookie: str, galleryname: str = None, thumb_size: str = "w300"
-) -> List[str]:
+) -> List[ImageUploaded]:
     uploadid = get_uploadid(cookie)
     if not uploadid:
         logger.warning("获取uploadid失败")
@@ -34,16 +34,19 @@ def hdbits_upload(
     params = {"uploadid": uploadid}
 
     for count, img in enumerate(imgs):
-        files = {
+        data = {
             "name": img.name,
             "thumbsize": thumb_size,
-            "galleryoption": 2,
+            "galleryoption": 1,
             "galleryname": galleryname if galleryname else uploadid,
             "existgallery": 1,
+        }
+        files = {
             "file": open(img, "rb"),
         }
         req = requests.post(
             f"https://img.hdbits.org/upload.php?uploadid={uploadid}",
+            data=data,
             files=files,
             headers=headers,
         )
