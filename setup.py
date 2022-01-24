@@ -35,6 +35,8 @@ setup(
         "pymediainfo>=5.0",
         "torf>=3.0.0",
         "requests",
+        "bencode.py==4.0.0",
+        "lxml>=4.0.0",
     ],
     entry_points={
         "console_scripts": [
