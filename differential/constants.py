@@ -18,6 +18,7 @@ BOOLEAN_ARGS = (
     "easy_upload",
     "trim_description",
     "combine_screenshots",
+    "imgbox_family_safe",
     "use_short_bdinfo",
     "use_short_url",
     "reuse_torrent",
@@ -34,6 +35,7 @@ class ImageHosting(Enum):
     SMMS = "smms"
     BYR = "byr"
     HDB = "hdb"
+    IMGBOX = "imgbox"
 
     @staticmethod
     def parse(s: str):
@@ -51,4 +53,6 @@ class ImageHosting(Enum):
             return ImageHosting.BYR
         elif s.lower() == "hdb":
             return ImageHosting.HDB
+        elif s.lower() == "imgbox":
+            return ImageHosting.IMGBOX
         raise ValueError(f"不支持的图床：{s}")
