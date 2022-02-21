@@ -20,3 +20,4 @@ def open_link(link: str, use_short_url: bool = False):
         logger.info(f"未找到浏览器，请直接复制以下链接：{link}")
     else:
         browser.open(link, new=1)
+        logger.info(f"如果浏览器未打开，请直接复制以下链接：{link}")
