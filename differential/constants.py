@@ -23,6 +23,7 @@ BOOLEAN_ARGS = (
     "use_short_url",
     "reuse_torrent",
     "scan_bdinfo",
+    "create_folder",
 )
 
 URL_SHORTENER_PATH = "https://lg.to"
@@ -41,17 +42,17 @@ class ImageHosting(Enum):
     def parse(s: str):
         if isinstance(s, ImageHosting):
             return s
-        if s.lower() == "ptpimg":
+        if s.lower() == "ptpimg" or s.lower() == 'ptp':
             return ImageHosting.PTPIMG
         elif s.lower() == "imgurl":
             return ImageHosting.IMGURL
         elif s.lower() == "chevereto":
             return ImageHosting.CHEVERETO
-        elif s.lower() == "smms":
+        elif s.lower() == "smms" or s.lower() == "sm.ms":
             return ImageHosting.SMMS
         elif s.lower() == "byr":
             return ImageHosting.BYR
-        elif s.lower() == "hdb":
+        elif s.lower() == "hdb" or s.lower() == 'hdbits':
             return ImageHosting.HDB
         elif s.lower() == "imgbox":
             return ImageHosting.IMGBOX

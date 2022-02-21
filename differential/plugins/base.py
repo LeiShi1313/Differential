@@ -139,6 +139,13 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             default=argparse.SUPPRESS,
         )
         parser.add_argument(
+            "--create-folder",
+            action="store_true",
+            dest="create_folder",
+            help="如果目标为文件，创建文件夹并把目标文件放入其中",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
             "--use-short-bdinfo",
             action="store_true",
             help="使用QUICK SUMMARY作为BDInfo，默认使用完整BDInfo",
@@ -320,6 +327,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         upload_url: str,
         screenshot_count: int = 0,
         optimize_screenshot: bool = True,
+        create_folder: bool = False,
         use_short_bdinfo: bool = False,
         scan_bdinfo: bool = True,
         image_hosting: ImageHosting = ImageHosting.PTPIMG,
@@ -358,6 +366,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.upload_url = upload_url
         self.screenshot_count = screenshot_count
         self.optimize_screenshot = optimize_screenshot
+        self.create_folder = create_folder
         self.use_short_bdinfo = use_short_bdinfo
         self.scan_bdinfo = scan_bdinfo
         self.image_hosting = image_hosting
@@ -599,7 +608,18 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         logger.info(f"正在获取Mediainfo: {self.folder}")
         has_bdmv = False
         if self.folder.is_file():
-            self._main_file = self.folder
+            if not self.create_folder:
+                self._main_file = self.folder
+            else:
+                logger.info("目标是文件，正在创建文件夹...")
+                folder = self.folder.parent.joinpath(self.folder.stem)
+                filename = self.folder.name
+                # TODO: decide whether to add exist_ok=True
+                if not folder.is_dir():
+                    os.makedirs(folder)
+                shutil.move(str(self.folder.absolute()), folder)
+                self.folder = folder
+                self._main_file = folder.joinpath(filename)
         else:
             logger.info("目标为文件夹，正在获取最大的文件...")
             biggest_size = -1
