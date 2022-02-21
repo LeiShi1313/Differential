@@ -25,3 +25,9 @@ jobs:
       run: |
         python setup.py sdist
         twine upload dist/*
+        
+    - name: Send message to Telegram
+      uses: Lukasss93/telegram-action@v2
+      env:
+        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
