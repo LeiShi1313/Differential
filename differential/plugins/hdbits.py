@@ -1,6 +1,8 @@
 import argparse
 
 from differential.plugins.base import Base
+from differential.utils.mediainfo import get_full_mediainfo
+
 
 
 class HDBits(Base):
