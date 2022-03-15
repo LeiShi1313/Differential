@@ -56,6 +56,7 @@ def get_full_mediainfo(mediainfo: MediaInfo) -> str:
             "Complete name",
             "Format",
             "Format version",
+            "File Size",
             "Duration",
             "Overall bit rate",
             "Encoded date",
