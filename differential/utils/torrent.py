@@ -31,7 +31,7 @@ def remake_torrent(path: Path, tracker: str, old_torrent: str) -> Optional[bytes
     new_torrent[b'comment'] = f"Generate by Differential {version} made by XGCM"
     new_torrent[b'info'] = {b'private': 1}
     for k, v in torrent[b'info'].items():
-        if k in (b'files', b'name', b'piece length', b'pieces'):
+        if k in (b'length', b'files', b'name', b'piece length', b'pieces'):
             new_torrent[b'info'][k] = v
     return bencodepy.encode(new_torrent)
 
