@@ -25,7 +25,8 @@ def remake_torrent(path: Path, tracker: str, old_torrent: str) -> Optional[bytes
         logger.warning(f"洗种的基础种子很可能不匹配！基础种子文件名为：{_name}，而将要制种的文件名为：{path.name}")
 
     new_torrent = {}
-    new_torrent[b'announce'] = tracker
+    if tracker:
+        new_torrent[b'announce'] = tracker
     new_torrent[b'created by'] = f"Differential {version}"
     new_torrent[b'comment'] = f"Generate by Differential {version} made by XGCM"
     new_torrent[b'info'] = {b'private': 1}
