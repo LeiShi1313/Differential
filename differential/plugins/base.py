@@ -607,6 +607,9 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         # Always find the biggest file in the folder
         logger.info(f"正在获取Mediainfo: {self.folder}")
         has_bdmv = False
+        if not self.folder.exists() and self.create_folder and '.' in str(self.folder):
+            # If file not exist and create_folder is True, try to find the folder with the same name
+            self.folder = self.folder.parent.joinpath(self.folder.stem)
         if self.folder.is_file():
             if not self.create_folder:
                 self._main_file = self.folder
