@@ -8,6 +8,7 @@ import tempfile
 import argparse
 from pathlib import Path
 from typing import Optional
+from itertools import chain
 from urllib.parse import quote
 from abc import ABC, ABCMeta, abstractmethod
 
@@ -32,6 +33,7 @@ from differential.utils.mediainfo import (
 )
 from differential.utils.image import (
     ImageUploaded,
+    get_all_images,
     byr_upload,
     hdbits_upload,
     imgbox_upload,
@@ -40,6 +42,7 @@ from differential.utils.image import (
     imgurl_upload,
     chevereto_api_upload,
     chevereto_username_upload,
+    cloudinary_upload,
 )
 
 PARSER = argparse.ArgumentParser(description="Differential - 差速器 PT快速上传工具")
@@ -139,6 +142,12 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             default=argparse.SUPPRESS,
         )
         parser.add_argument(
+            "--screenshot-path",
+            type=str,
+            help="截图文件夹，会在提供的文件夹中查找图片并上传，不会再生成截图",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
             "--create-folder",
             action="store_true",
             dest="create_folder",
@@ -234,6 +243,24 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             default=argparse.SUPPRESS,
         )
         parser.add_argument(
+            "--cloudinary-cloud-name",
+            type=str,
+            help="Cloudinary的cloud name",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--cloudinary-api-key",
+            type=str,
+            help="Cloudinary的api key",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--cloudinary-api-secret",
+            type=str,
+            help="Cloudinary的api secret",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
             "--imgbox-username",
             type=str,
             help="Imgbox图床登录用户名，留空则匿名上传",
@@ -326,6 +353,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         url: str,
         upload_url: str,
         screenshot_count: int = 0,
+        screenshot_path: str = None,
         optimize_screenshot: bool = True,
         create_folder: bool = False,
         use_short_bdinfo: bool = False,
@@ -339,6 +367,9 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         chevereto_api_key: str = None,
         chevereto_username: str = None,
         chevereto_password: str = None,
+        cloudinary_cloud_name: str = None,
+        cloudinary_api_key: str = None,
+        cloudinary_api_secret: str = None,
         imgurl_api_key: str = None,
         smms_api_key: str = None,
         byr_authorization: str = None,
@@ -365,6 +396,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.url = url
         self.upload_url = upload_url
         self.screenshot_count = screenshot_count
+        self.screenshot_path = screenshot_path
         self.optimize_screenshot = optimize_screenshot
         self.create_folder = create_folder
         self.use_short_bdinfo = use_short_bdinfo
@@ -378,6 +410,9 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.chevereto_username = chevereto_username
         self.chevereto_password = chevereto_password
         self.chevereto_api_key = chevereto_api_key
+        self.cloudinary_cloud_name = cloudinary_cloud_name
+        self.cloudinary_api_key = cloudinary_api_key
+        self.cloudinary_api_secret = cloudinary_api_secret
         self.imgurl_api_key = imgurl_api_key
         self.smms_api_key = smms_api_key
         self.byr_authorization = byr_authorization
@@ -422,19 +457,19 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                     for line in f.readlines():
                         url, thumb = line.split(" ")
                         _img_urls.append(ImageUploaded(url, thumb))
-                if len(_img_urls) == len(list(Path(img_dir).glob("*.png"))):
+                if len(_img_urls) == len(list(get_all_images(img_dir))):
                     logger.info(f"发现已上传的{len(_img_urls)}张截图链接")
                     return _img_urls
             if self.image_hosting == ImageHosting.HDB:
                 img_urls = hdbits_upload(
-                    sorted(Path(img_dir).glob("*.png")),
+                    sorted(get_all_images(img_dir)),
                     self.hdbits_cookie,
                     self.folder.name,
                     self.hdbits_thumb_size,
                 )
             elif self.image_hosting == ImageHosting.IMGBOX:
                 img_urls = imgbox_upload(
-                    sorted(Path(img_dir).glob("*.png")),
+                    sorted(get_all_images(img_dir)),
                     self.imgbox_username,
                     self.imgbox_password,
                     self.folder.name,
@@ -443,12 +478,12 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                     False,
                 )
             if not img_urls:
-                logger.info("HDBits图床上传失败，请自行上传截图：{}".format(img_dir))
+                logger.info("图床上传失败，请自行上传截图：{}".format(img_dir))
             with open(img_urls_file, "w") as f:
                 for img_url in img_urls:
                     f.write(f"{img_url.url} {img_url.thumb}\n")
         else:
-            for count, img in enumerate(sorted(Path(img_dir).glob("*.png"))):
+            for count, img in enumerate(sorted(get_all_images(img_dir))):
                 if img.is_file():
                     img_url = None
                     img_url_file = img.resolve().parent.joinpath(
@@ -492,6 +527,23 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                                 logger.error(
                                     "Chevereto的API或用户名或密码未设置，请检查chevereto-username/chevereto-password设置"
                                 )
+                        elif self.image_hosting == ImageHosting.CLOUDINARY:
+                            if (
+                                not self.cloudinary_cloud_name
+                                or not self.cloudinary_api_key
+                                or not self.cloudinary_api_secret
+                            ):
+                                logger.error(
+                                    "Cloudinary的参数未设置，请检查cloudinary_cloud_name/cloudinary_api_key/cloudinary_api_secret设置"
+                                )
+                            else:
+                                img_url = cloudinary_upload(
+                                    img,
+                                    self.folder.stem,
+                                    self.cloudinary_cloud_name,
+                                    self.cloudinary_api_key,
+                                    self.cloudinary_api_secret,
+                                )
                         elif self.image_hosting == ImageHosting.IMGURL:
                             if self.imgurl_hosting_url.endswith("/"):
                                 self.imgurl_hosting_url = self.imgurl_hosting_url[:-1]
@@ -510,7 +562,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                                 img, self.byr_authorization, self.byr_alternative_url
                             )
                     if img_url:
-                        logger.info(f"第{count + 1}张截图地址：{img_url}")
+                        logger.info(f"第{count + 1}张截图地址：{img_url.url}")
                         with open(img_url_file, "w") as f:
                             if img_url.thumb:
                                 f.write(f"{img_url.url} {img_url.thumb}")
@@ -607,7 +659,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         # Always find the biggest file in the folder
         logger.info(f"正在获取Mediainfo: {self.folder}")
         has_bdmv = False
-        if not self.folder.exists() and self.create_folder and '.' in str(self.folder):
+        if not self.folder.exists() and self.create_folder and "." in str(self.folder):
             # If file not exist and create_folder is True, try to find the folder with the same name
             self.folder = self.folder.parent.joinpath(self.folder.stem)
         if self.folder.is_file():
@@ -709,8 +761,18 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             logger.error("未找到可以被截图的资源，请确认目标目录含有支持的资源!")
             return []
 
-        temp_dir = self._make_screenshots()
-        if temp_dir is None:
+        if not self.screenshot_path:
+            temp_dir = self._make_screenshots()
+        else:
+            temp_dir = self.screenshot_path
+            images = list(sorted(get_all_images(temp_dir)))
+            if not any(images):
+                logger.warning("未在截图文件夹找到支持的图片文件（jpg、jpeg、png、gif、webp）")
+            else:
+                logger.info(
+                    "发现以下图片文件：\n{}".format("\n".join("- " + i.name for i in images))
+                )
+        if temp_dir is None or not Path(temp_dir).exists():
             return []
 
         # 上传截图
