@@ -1089,7 +1089,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 logger.info(f"种子描述：\n{self.description}")
             open_link(link, self.use_short_url)
         elif self.auto_feed:
-            link = f"{self.upload_url}{quote(self.auto_feed_info, safe='#:/=@')}"
+            link = f"{self.upload_url}{quote(self.auto_feed_info, safe='#:/=@,')}"
             # if self.trim_description:
             #     logger.info(f"种子描述：\n{self.description}")
             logger.trace(f"已生成自动上传链接：{link}")
