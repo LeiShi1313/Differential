@@ -379,6 +379,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         imgbox_thumbnail_size: str = "300r",
         imgbox_family_safe: bool = True,
         ptgen_url: str = "https://ptgen.lgto.workers.dev",
+        second_ptgen_url: str = "https://ptgen.caosen.com",
         announce_url: str = "https://example.com",
         ptgen_retry: int = 3,
         generate_nfo: bool = False,
@@ -422,6 +423,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.imgbox_thumbnail_size = imgbox_thumbnail_size
         self.imgbox_family_safe = imgbox_family_safe
         self.ptgen_url = ptgen_url
+        self.second_ptgen_url = second_ptgen_url
         self.announce_url = announce_url
         self.ptgen_retry = ptgen_retry
         self.generate_nfo = generate_nfo
@@ -573,12 +575,12 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                         logger.info(f"第{count + 1}张截图上传失败，请自行上传：{img.resolve()}")
         return img_urls
 
-    def _get_ptgen(self) -> dict:
+    def _get_ptgen(self, use_second: bool = False) -> dict:
         self._imdb = {}
         ptgen_failed = {"format": "PTGen获取失败，请自行获取相关信息", "failed": True}
         logger.info(f"正在获取PTGen: {self.url}")
         params = {"url": self.url}
-        req = requests.get(self.ptgen_url, params)
+        req = requests.get(self.ptgen_url if not use_second else self.second_ptgen_url, params)
         if not req.ok:
             logger.trace(req.content)
             logger.warning(f"获取PTGen失败: HTTP f{req.status_code}, reason: {req.reason}")
@@ -785,10 +787,10 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         return screenshots
 
     def _prepare(self):
-        ptgen_retry = self.ptgen_retry
+        ptgen_retry = 2 * self.ptgen_retry
         self._ptgen = self._get_ptgen()
         while self._ptgen.get("failed") and ptgen_retry > 0:
-            self._ptgen = self._get_ptgen()
+            self._ptgen = self._get_ptgen(ptgen_retry <= self.ptgen_retry)
             ptgen_retry -= 1
         self._mediainfo = self._find_mediainfo()
         if self.generate_nfo:
