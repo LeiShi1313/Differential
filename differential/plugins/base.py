@@ -795,7 +795,8 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self._mediainfo = self._find_mediainfo()
         if self.generate_nfo:
             self._generate_nfo()
-        self._screenshots = self._get_screenshots()
+        if self.screenshot_count > 0:
+            self._screenshots = self._get_screenshots()
         if self.make_torrent:
             make_torrent(
                 self.folder,
