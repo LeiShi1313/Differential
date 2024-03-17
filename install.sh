@@ -36,7 +36,8 @@ do_install() {
 			dist_version="$(sed 's/\/.*//' /etc/debian_version | sed 's/\..*//')"
 			case "$dist_version" in
 				11)
-					dist_version="bullseye"
+					# Mono is not available for Debian 11
+					dist_version="buster"
 				;;
 				10)
 					dist_version="buster"
