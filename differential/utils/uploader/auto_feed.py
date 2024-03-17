@@ -82,10 +82,16 @@ class AutoFeed(TorrnetBase):
             'tracklist': '', # 音乐特有
             'music_type': '', # 音乐特有
             'music_media': '', # 音乐特有
+            'edition_info': '', # 音乐特有
+            'music_name': '', # 音乐特有
+            'music_author': '', # 音乐特有
             'animate_info': '', # 动漫特有|针对北邮人北洋U2的命名方式
             'anidb': '', # 动漫特有
-            'torrent_name': '', # 动漫辅助
+            'torrentName': '', # 动漫辅助
             'images': self.screenshots, #  截图
+
+            'torrent_name': '', # 用于转发内站
+            'torrent_url': '', # 用于转发内站
 
             # 选择类信息
             'type': self.category,  # type:可取值——电影/纪录/体育/剧集/动画/综艺……
@@ -107,6 +113,9 @@ class AutoFeed(TorrnetBase):
             'youtube_url': '', # 用于发布iTS
             'ptp_poster': '',  # 用于发布iTS
             'comparisons': '', # 用于海豹
+            'version_info': '', # 用于海豹
+            'multi_mediainfo': '', # 用于海豹
+            'labels': 0
         }
 
     @property
