@@ -13,7 +13,7 @@
 
 # 如何安装差速器
 
-> 可以移步我的[博客](https://lg.to/dft)查看详细的教程
+> 可以移步我的[博客](https://2cn.io/dft)查看详细的教程
 > 也可以到[Telegram群组](https://t.me/ptdft)来讨论各种问题
 
 ## Linux

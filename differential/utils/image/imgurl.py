@@ -5,7 +5,7 @@ from typing import Optional
 import requests
 from loguru import logger
 
-from differential.utils.image import ImageUploaded
+from differential.utils.image.types import ImageUploaded
 
 def imgurl_upload(img: Path, url: str, api_key: str) -> Optional[ImageUploaded]:
     data = {'token': api_key}

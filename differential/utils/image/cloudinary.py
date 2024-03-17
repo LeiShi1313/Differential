@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 import requests
 from loguru import logger
 
-from differential.utils.image import ImageUploaded
+from differential.utils.image.types import ImageUploaded
 
 
 def cloudinary_upload(img: Path, folder: str, cloud_name: str, api_key: str, api_secret: str) -> Optional[ImageUploaded]:

@@ -9,7 +9,7 @@ import requests
 from loguru import logger
 from lxml.html import fromstring
 
-from differential.utils.image import ImageUploaded
+from differential.utils.image.types import ImageUploaded
 
 
 def get_csrf_token(session) -> Optional[str]:

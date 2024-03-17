@@ -10,10 +10,10 @@ class Wrapper:
 
 __all__ = []
 for loader, name, is_pkg in pkgutil.walk_packages(__path__):
-    m = loader.find_module(name)
-    if not m:
+    spec = loader.find_spec(name)
+    if not spec:
         continue
-    module = m.load_module(name)
+    module = spec.loader.load_module()
     for name, value in inspect.getmembers(module):
         if name.startswith('__'):
             continue

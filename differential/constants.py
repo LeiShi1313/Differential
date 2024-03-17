@@ -26,7 +26,7 @@ BOOLEAN_ARGS = (
     "create_folder",
 )
 
-URL_SHORTENER_PATH = "https://lg.to"
+URL_SHORTENER_PATH = "https://2cn.io"
 
 
 class ImageHosting(Enum):
