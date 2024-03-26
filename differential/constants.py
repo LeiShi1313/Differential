@@ -24,6 +24,7 @@ BOOLEAN_ARGS = (
     "reuse_torrent",
     "scan_bdinfo",
     "create_folder",
+    "optimize_screenshot",
 )
 
 URL_SHORTENER_PATH = "https://2cn.io"

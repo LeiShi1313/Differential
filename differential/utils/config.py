@@ -1,6 +1,8 @@
 import argparse
 from configparser import RawConfigParser
 
+from loguru import logger
+
 from differential.constants import ImageHosting, BOOLEAN_ARGS, BOOLEAN_STATES
 
 
@@ -9,7 +11,8 @@ def merge_config(args: argparse.Namespace, section: str = '') -> dict:
     config = None
     if hasattr(args, 'config'):
         config = RawConfigParser()
-        config.read(args.config, encoding='utf-8')
+        with open(args.config, 'r', encoding='utf-8') as f:
+            config.read_file(f)
 
     if config:
         # First use the args in the general section

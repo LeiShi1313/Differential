@@ -39,7 +39,6 @@ def remake_torrent(path: Path, tracker: str, old_torrent: str) -> Optional[bytes
 def make_torrent_progress(torrent, filepath, pieces_done, pieces_total):
     logger.info(f'制种进度: {pieces_done/pieces_total*100:3.0f} %')
 
-
 def make_torrent(path: Path, tracker: str, prefix: str = None, reuse_torrent: bool = True, from_torrent: str = None):
     torrent_name = path.resolve().parent.joinpath((f"[{prefix}]." if prefix else '') + f"{path.name if path.is_dir() else path.stem}.torrent")
     if from_torrent and Path(from_torrent).is_file():

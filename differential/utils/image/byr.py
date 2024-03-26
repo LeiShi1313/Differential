@@ -22,7 +22,7 @@ def byr_upload(img: Path, authorization: str, url: Optional[str] = None) -> Opti
     if url:
         m = re.search(r"\'({}.*?)\'".format(url), req.text)
     else:
-        m = re.search(r"\'(https://byr.usx.leishi.io.*?)\'", req.text)
+        m = re.search(r"\'(https://byr.pt.*?)\'", req.text)
     if not m:
         logger.trace(req.content)
         logger.warning(f"图片直链获取失败")
