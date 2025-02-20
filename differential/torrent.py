@@ -82,7 +82,6 @@ class TorrnetBase:
     @abstractmethod
     def source(self):
         raise NotImplementedError()
-        return ""
 
     @property
     @abstractmethod

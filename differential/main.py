@@ -1,15 +1,25 @@
 import re
+import sys
+from pathlib import Path
 
 from loguru import logger
 
 from differential.version import version
+from differential.commands import PRE_PARSER, PARSER
 from differential.utils.config import merge_config
-from differential.plugins.base import PARSER, REGISTERED_PLUGINS
-
+from differential.plugin_register import REGISTERED_PLUGINS
+from differential.plugin_loader import load_plugins_from_dir, load_plugin_from_file
 
 @logger.catch
 def main():
-    args = PARSER.parse_args()
+    known_args, remaining_argv = PRE_PARSER.parse_known_args()
+    load_plugins_from_dir(Path(__file__).resolve().parent.joinpath("plugins"))
+    if known_args.plugin:
+        load_plugin_from_file(known_args.plugin)
+    elif known_args.plugin_folder:
+        load_plugins_from_dir(known_args.plugin_folder)
+
+    args = PARSER.parse_args(remaining_argv)
     logger.info("Differential 差速器 {}".format(version))
     config = merge_config(args, args.section)
 
@@ -17,6 +27,7 @@ def main():
         log = config.pop('log')
         logger.add(log, level="TRACE", backtrace=True, diagnose=True)
 
+    logger.debug("Config: {}".format(config))
     if hasattr(args, 'plugin'):
         plugin = config.pop('plugin')
         try:

@@ -1,6 +1,6 @@
 import argparse
 
-from differential.plugins.base import Base
+from differential.base_plugin import Base
 from differential.utils.mediainfo import get_full_mediainfo
 
 

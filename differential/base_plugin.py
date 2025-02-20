@@ -18,6 +18,7 @@ from loguru import logger
 from pymediainfo import MediaInfo
 
 from differential import tools
+from differential.plugin_register import PluginRegister
 from differential.torrent import TorrnetBase
 from differential.version import version
 from differential.constants import ImageHosting
@@ -44,53 +45,6 @@ from differential.utils.image import (
     chevereto_username_upload,
     cloudinary_upload,
 )
-
-PARSER = argparse.ArgumentParser(description="Differential - 差速器 PT快速上传工具")
-PARSER.add_argument(
-    "-v",
-    "--version",
-    help="显示差速器当前版本",
-    action="version",
-    version=f"Differential {version}",
-)
-PARSER.add_argument(
-    "--section", default="", help="指定config的section，差速器配置会依次从默认、插件默认和指定section读取并覆盖"
-)
-subparsers = PARSER.add_subparsers(help="使用下列插件名字来查看插件的详细用法")
-REGISTERED_PLUGINS = {}
-
-
-class PluginRegister(ABCMeta):
-    def __init__(cls, name, bases, attrs):
-        super().__init__(name, bases, attrs)
-        # Skip base class
-        if name != "Base" and name not in REGISTERED_PLUGINS:
-            aliases = (name.lower(),)
-            if "get_aliases" in cls.__dict__:
-                aliases += cls.get_aliases()
-            subparser = subparsers.add_parser(
-                name, aliases=aliases, help=cls.get_help()
-            )
-            subparser.set_defaults(plugin=name)
-            cls.add_parser(subparser)
-            for n in aliases:
-                REGISTERED_PLUGINS[n] = cls
-            REGISTERED_PLUGINS[name] = cls
-
-    @classmethod
-    @abstractmethod
-    def get_help(mcs):
-        raise NotImplementedError()
-
-    @classmethod
-    @abstractmethod
-    def get_aliases(mcs):
-        raise NotImplementedError()
-
-    @classmethod
-    @abstractmethod
-    def add_parser(mcs, parser: argparse.ArgumentParser):
-        raise NotImplementedError()
 
 
 class Base(ABC, TorrnetBase, metaclass=PluginRegister):
@@ -444,6 +398,60 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self._mediainfo: Optional[MediaInfo] = None
         self._screenshots: list = []
 
+
+    def upload(self):
+        self._prepare()
+        if self.easy_upload:
+            torrent_info = self.easy_upload_torrent_info
+            if self.trim_description:
+                # 直接打印简介部分来绕过浏览器的链接长度限制
+                torrent_info["description"] = ""
+            logger.trace(f"torrent_info: {torrent_info}")
+            link = f"{self.upload_url}#torrentInfo={quote(json.dumps(torrent_info))}"
+            logger.trace(f"已生成自动上传链接：{link}")
+            if self.trim_description:
+                logger.info(f"种子描述：\n{self.description}")
+            open_link(link, self.use_short_url)
+        elif self.auto_feed:
+            link = f"{self.upload_url}{quote(self.auto_feed_info, safe='#:/=@,')}"
+            # if self.trim_description:
+            #     logger.info(f"种子描述：\n{self.description}")
+            logger.trace(f"已生成自动上传链接：{link}")
+            open_link(link, self.use_short_url)
+        else:
+            logger.info(
+                "\n"
+                f"标题: {self.title}\n"
+                f"副标题: {self.subtitle}\n"
+                f"豆瓣: {self.douban_url}\n"
+                f"IMDB: {self.imdb_url}\n"
+                f"视频编码: {self.video_codec} 音频编码: {self.audio_codec} 分辨率: {self.resolution}\n"
+                f"描述:\n{self.description}"
+            )
+
+
+    def _prepare(self):
+        self._mediainfo = self._find_mediainfo()
+
+        ptgen_retry = 2 * self.ptgen_retry
+        self._ptgen = self._get_ptgen()
+        while self._ptgen.get("failed") and ptgen_retry > 0:
+            self._ptgen = self._get_ptgen(ptgen_retry <= self.ptgen_retry)
+            ptgen_retry -= 1
+
+        if self.generate_nfo:
+            self._generate_nfo()
+        if self.screenshot_count > 0:
+            self._screenshots = self._get_screenshots()
+        if self.make_torrent:
+            make_torrent(
+                self.folder,
+                self.announce_url,
+                self.__class__.__name__,
+                self.reuse_torrent,
+                self.from_torrent,
+            )
+
     def upload_screenshots(self, img_dir: str) -> list:
         img_urls = []
         if (
@@ -786,26 +794,6 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
         return screenshots
 
-    def _prepare(self):
-        ptgen_retry = 2 * self.ptgen_retry
-        self._ptgen = self._get_ptgen()
-        while self._ptgen.get("failed") and ptgen_retry > 0:
-            self._ptgen = self._get_ptgen(ptgen_retry <= self.ptgen_retry)
-            ptgen_retry -= 1
-        self._mediainfo = self._find_mediainfo()
-        if self.generate_nfo:
-            self._generate_nfo()
-        if self.screenshot_count > 0:
-            self._screenshots = self._get_screenshots()
-        if self.make_torrent:
-            make_torrent(
-                self.folder,
-                self.announce_url,
-                self.__class__.__name__,
-                self.reuse_torrent,
-                self.from_torrent,
-            )
-
     @property
     def parsed_encoder_log(self):
         return parse_encoder_log(self.encoder_log)
@@ -1077,33 +1065,3 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     @property
     def auto_feed_info(self):
         return AutoFeed(plugin=self).info
-
-    def upload(self):
-        self._prepare()
-        if self.easy_upload:
-            torrent_info = self.easy_upload_torrent_info
-            if self.trim_description:
-                # 直接打印简介部分来绕过浏览器的链接长度限制
-                torrent_info["description"] = ""
-            logger.trace(f"torrent_info: {torrent_info}")
-            link = f"{self.upload_url}#torrentInfo={quote(json.dumps(torrent_info))}"
-            logger.trace(f"已生成自动上传链接：{link}")
-            if self.trim_description:
-                logger.info(f"种子描述：\n{self.description}")
-            open_link(link, self.use_short_url)
-        elif self.auto_feed:
-            link = f"{self.upload_url}{quote(self.auto_feed_info, safe='#:/=@,')}"
-            # if self.trim_description:
-            #     logger.info(f"种子描述：\n{self.description}")
-            logger.trace(f"已生成自动上传链接：{link}")
-            open_link(link, self.use_short_url)
-        else:
-            logger.info(
-                "\n"
-                f"标题: {self.title}\n"
-                f"副标题: {self.subtitle}\n"
-                f"豆瓣: {self.douban_url}\n"
-                f"IMDB: {self.imdb_url}\n"
-                f"视频编码: {self.video_codec} 音频编码: {self.audio_codec} 分辨率: {self.resolution}\n"
-                f"描述:\n{self.description}"
-            )

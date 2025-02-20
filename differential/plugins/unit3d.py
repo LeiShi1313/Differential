@@ -1,6 +1,6 @@
 import argparse
 
-from differential.plugins.base import Base
+from differential.base_plugin import Base
 
 
 class Unit3D(Base):
