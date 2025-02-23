@@ -21,7 +21,7 @@ def find_binary(name: str, alternative_names: list = None) -> Optional[Path]:
     if path:
         pp = Path(path)
         if not pp.is_file():
-            logger.error(f"{p}不是可执行文件！")
+            logger.error(f"{pp}不是可执行文件！")
             sys.exit(1)
         return pp
     for n in [name] + alternative_names:
@@ -91,8 +91,16 @@ def execute(binary_name: str, args: str, abort: bool = False) -> str:
 
 
 def ffmpeg(path: Path, extra_args: str = "") -> str:
-    return execute("ffmpeg", f'-i "{path.absolute()}" {extra_args}')
+    if platform.system() != "Windows":
+        path = str(path.absolute()).replace('"', '\\"')
+    else:
+        path = path.absolute()
+    return execute("ffmpeg", f'-i "{path}" {extra_args}')
 
 
 def ffprobe(path: Path) -> str:
-    return execute("ffprobe", f'-i "{path.absolute()}"')
+    if platform.system() != "Windows":
+        path = str(path.absolute()).replace('"', '\\"')
+    else:
+        path = path.absolute()
+    return execute("ffprobe", f'-i "{path}"')

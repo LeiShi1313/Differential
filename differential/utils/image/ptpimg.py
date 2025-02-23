@@ -1,16 +1,27 @@
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import requests
 from loguru import logger
 
+from differential.constants import ImageHosting
 from differential.utils.image.types import ImageUploaded
 
-def ptpimg_upload(img: Path, api_key: str) -> Optional[ImageUploaded]:
-    data = {'api_key': api_key}
+
+def ptpimg_upload(imgs: List[Path], api_key: str) -> List[ImageUploaded]:
+    uploaded = []
+    for img in imgs:
+        if cached := ImageUploaded.from_pickle(img, ImageHosting.PTPIMG):
+            uploaded.append(cached)
+        elif u := _ptpimg_upload(img, api_key):
+            uploaded.append(u)
+    return uploaded
+
+
+def _ptpimg_upload(img: Path, api_key: str) -> Optional[ImageUploaded]:
     files = {'file-upload[0]': open(img, 'rb')}
-    req = requests.post('https://ptpimg.me/upload.php', data=data, files=files)
+    req = requests.post('https://ptpimg.me/upload.php', data={'api_key': api_key}, files=files)
 
     try:
         res = req.json()
@@ -20,9 +31,9 @@ def ptpimg_upload(img: Path, api_key: str) -> Optional[ImageUploaded]:
     if not req.ok:
         logger.trace(req.content)
         logger.warning(
-            f"上传图片失败: HTTP {req.status_code}, reason: {req.reason}")
+            f"[Screenshots] 上传图片失败: HTTP {req.status_code}, reason: {req.reason}")
         return None
     if len(res) < 1 or 'code' not in res[0] or 'ext' not in res[0]:
-        logger.warning(f"图片直链获取失败")
+        logger.warning("[Screenshots] 图片直链获取失败")
         return None
-    return ImageUploaded(f"https://ptpimg.me/{res[0].get('code')}.{res[0].get('ext')}")
+    return ImageUploaded(hosting=ImageHosting.PTPIMG, image=img, url=f"https://ptpimg.me/{res[0].get('code')}.{res[0].get('ext')}")

@@ -2,13 +2,14 @@ import os
 import re
 import random
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Tuple, Dict, Any
 from string import ascii_letters, digits
 
 import requests
 from loguru import logger
 from lxml.html import fromstring
 
+from differential.constants import ImageHosting
 from differential.utils.image.types import ImageUploaded
 
 
@@ -21,7 +22,7 @@ def get_uploadid(cookie: str) -> str:
 
 
 def hdbits_upload(
-    imgs: List[Path], cookie: str, galleryname: str = None, thumb_size: str = "w300"
+    images: List[Path], cookie: str, galleryname: str = None, thumb_size: str = "w300"
 ) -> List[ImageUploaded]:
     uploadid = get_uploadid(cookie)
     if not uploadid:
@@ -31,9 +32,12 @@ def hdbits_upload(
         "cookie": cookie,
         "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
         }
-    params = {"uploadid": uploadid}
 
-    for count, img in enumerate(imgs):
+    uploaded: List[Union[ImageUploaded, bool, None]] = [None] * len(images)
+    for idx, img in enumerate(images):
+        if cached := ImageUploaded.from_pickle(img, ImageHosting.HDB):
+            uploaded[idx] = cached
+            continue
         data = {
             "name": img.name,
             "thumbsize": thumb_size,
@@ -53,36 +57,49 @@ def hdbits_upload(
 
         if not req.ok:
             logger.trace(req.content)
-            logger.warning(f"上传图片失败: HTTP {req.status_code}, reason: {req.reason}")
-            return None
+            logger.warning(f"[Screenshots] 上传图片失败: HTTP {req.status_code}, reason: {req.reason}")
+            uploaded[idx] = False
         elif req.json().get("error"):
             logger.trace(req.content)
             logger.warning(
-                f"上传图片失败: Code {req.json()['error'].get('code')}, message: {req.json()['error]'].get('message')}"
+                f"[Screenshots] 上传图片失败: Code {req.json()['error'].get('code')}, message: {req.json()['error]'].get('message')}"
             )
-            return None
-        logger.info(f"第{count+1}张截图上传成功")
+            uploaded[idx] = False
+        logger.info(f"[Screenshots] 第{idx+1}张截图上传成功")
+        uploaded[idx] = True
 
+    if any(x is True for x in uploaded):
+        urls, thumbs = _fetch_upload(uploadid, headers)
+        if len(urls) != len([x for x in uploaded if x is True]):
+            logger.warning(f"[Screenshots] 图片直链获取失败: \n{urls}\n{uploaded}")
+            return None
+        i = 0
+        for idx, val in enumerate(uploaded):
+            if val is True:
+                uploaded[idx] = ImageUploaded(
+                    hosting=ImageHosting.HDB,
+                    image = images[idx],
+                    url=urls[i],
+                    thumb=thumbs[i].replace("i.hdbits.org", "t.hdbits.org").replace(".png", ".jpg"),
+                )
+                i += 1
+
+    return [u for u in uploaded if isinstance(u, ImageUploaded)]
+
+def _fetch_upload(uploadid: str, headers: Dict[str, Any]) -> Tuple[List[str], List[str]]:
     req = requests.get(f"https://img.hdbits.org/done/{uploadid}", headers=headers)
     if not req.ok:
         logger.trace(req.content)
-        logger.warning(f"图片直链获取失败: HTTP {req.status_code}, reason: {req.reason}")
-        return None
+        logger.warning(f"[Screenshots] 图片直链获取失败: HTTP {req.status_code}, reason: {req.reason}")
+        return ([], [])
     root = fromstring(req.content)
     textareas = root.xpath("*//textarea")
     if not textareas:
-        logger.warning(f"图片直链获取失败: {root}")
-        return None
+        logger.warning(f"[Screenshots] 图片直链获取失败: {root}")
+        return ([], [])
     urls = textareas[1].text.split("\n")
     thumbs = textareas[2].text.split("\n")
     if len(urls) != len(thumbs):
-        logger.warning(f"图片直链获取失败: {root}")
-        return None
-
-    return [
-        ImageUploaded(
-            urls[i],
-            thumbs[i].replace("i.hdbits.org", "t.hdbits.org").replace(".png", ".jpg"),
-        )
-        for i in range(len(urls))
-    ]
+        logger.warning(f"[Screenshots] 图片直链获取失败: \n{urls}\n{thumbs}")
+        return ([], [])
+    return (urls, thumbs)

@@ -76,17 +76,17 @@ class LeagueOfficial(LemonHD):
             new_im.paste(im, (x, y))
 
         temp_dir = tempfile.mkdtemp()
-        screenshot_path = f'{temp_dir}/{self._main_file.stem}.thumb.png'
+        screenshot_path = f'{temp_dir}/{self.main_file.stem}.thumb.png'
         new_im.save(screenshot_path, format='png')
         return temp_dir
 
     @property
     def subtitle(self):
-        if not self._ptgen.get("site") == "douban":
+        if not self.douban:
             return ""
-        subtitle = f"{'/'.join(self._ptgen.get('this_title', []) + self._ptgen.get('aka', []))} "
-        if self._ptgen.get('cast'):
-            subtitle += f"[主演: {'/'.join([c.get('name').strip(string.ascii_letters+string.whitespace) for c in self._ptgen.get('cast')[:3]])}]"
+        subtitle = f"{'/'.join(self.douban.this_title + self.douban.aka)} "
+        if self.douban.cast:
+            subtitle += f"[主演: {'/'.join([c.get('name').strip(string.ascii_letters+string.whitespace) for c in self.douban.cast('cast')[:3]])}]"
         return subtitle
 
     @property
@@ -127,7 +127,7 @@ class LeagueOfficial(LemonHD):
             "[img]https://imgbox.leaguehd.com/images/2021/01/04/screens_01.png[/img]\n"
             "{}\n".format(
                 GROUP_QUOTES.get(self.team, ''),
-                self._ptgen.get("format"),
+                self.ptgen.format,
                 self.media_info,
                 "\n".join([f"{uploaded}" for uploaded in self._screenshots]),
             )

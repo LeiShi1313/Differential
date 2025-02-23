@@ -1,50 +1,28 @@
-import os
 import re
-import sys
 import json
-import shutil
-import platform
-import tempfile
 import argparse
 from pathlib import Path
 from typing import Optional
 from itertools import chain
 from urllib.parse import quote
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 
-import requests
-from PIL import Image
 from loguru import logger
-from pymediainfo import MediaInfo
 
-from differential import tools
 from differential.plugin_register import PluginRegister
 from differential.torrent import TorrnetBase
-from differential.version import version
 from differential.constants import ImageHosting
 from differential.utils.browser import open_link
 from differential.utils.torrent import make_torrent
 from differential.utils.parse import parse_encoder_log
 from differential.utils.uploader import EasyUpload, AutoFeed
-from differential.utils.binary import ffprobe, execute, execute_with_output
-from differential.utils.mediainfo import (
-    get_full_mediainfo,
-    get_resolution,
-    get_duration,
-)
-from differential.utils.image import (
-    ImageUploaded,
-    get_all_images,
-    byr_upload,
-    hdbits_upload,
-    imgbox_upload,
-    ptpimg_upload,
-    smms_upload,
-    imgurl_upload,
-    chevereto_api_upload,
-    chevereto_username_upload,
-    cloudinary_upload,
-)
+from differential.utils.mediainfo_handler import MediaInfoHandler
+from differential.utils.ptgen_handler import PTGenHandler
+from differential.utils.screenshot_handler import ScreenshotHandler
+from differential.utils.nfo import generate_nfo
+from differential.utils.ptgen.base import PTGenData, DataType
+from differential.utils.ptgen.imdb import IMDBData
+from differential.utils.ptgen.douban import DoubanData
 
 
 class Base(ABC, TorrnetBase, metaclass=PluginRegister):
@@ -62,7 +40,11 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             "-l", "--log", type=str, help="log文件的路径", default=argparse.SUPPRESS
         )
         parser.add_argument(
-            "-f", "--folder", type=str, help="种子文件夹的路径", default=argparse.SUPPRESS
+            "-f",
+            "--folder",
+            type=str,
+            help="种子文件夹的路径",
+            default=argparse.SUPPRESS,
         )
         parser.add_argument(
             "-u", "--url", type=str, help="豆瓣链接", default=argparse.SUPPRESS
@@ -185,9 +167,9 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             "--smms-api-key", type=str, help="SM.MS的API Key", default=argparse.SUPPRESS
         )
         parser.add_argument(
-            "--byr-authorization",
+            "--byr-cookie",
             type=str,
-            help="BYR的Authorization头，可登录后访问任意页面F12查看，形如Basic xxxxxxxxxxxxxxxx==",
+            help="BYR的Cookie，可登录后访问任意页面F12查看",
             default=argparse.SUPPRESS,
         )
         parser.add_argument(
@@ -250,10 +232,16 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             "--ptgen-url", type=str, help="自定义PTGEN的地址", default=argparse.SUPPRESS
         )
         parser.add_argument(
-            "--ptgen-retry", type=int, help="PTGEN重试次数，默认为3次", default=argparse.SUPPRESS
+            "--ptgen-retry",
+            type=int,
+            help="PTGEN重试次数，默认为3次",
+            default=argparse.SUPPRESS,
         )
         parser.add_argument(
-            "--announce-url", type=str, help="制种时announce地址", default=argparse.SUPPRESS
+            "--announce-url",
+            type=str,
+            help="制种时announce地址",
+            default=argparse.SUPPRESS,
         )
 
         parser.add_argument(
@@ -326,14 +314,14 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         cloudinary_api_secret: str = None,
         imgurl_api_key: str = None,
         smms_api_key: str = None,
-        byr_authorization: str = None,
+        byr_cookie: str = None,
         byr_alternative_url: str = None,
         imgbox_username: str = None,
         imgbox_password: str = None,
         imgbox_thumbnail_size: str = "300r",
         imgbox_family_safe: bool = True,
         ptgen_url: str = "https://ptgen.lgto.workers.dev",
-        second_ptgen_url: str = "https://ptgen.caosen.com",
+        second_ptgen_url: str = "https://api.slyw.me",
         announce_url: str = "https://example.com",
         ptgen_retry: int = 3,
         generate_nfo: bool = False,
@@ -350,36 +338,8 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.folder = Path(folder)
         self.url = url
         self.upload_url = upload_url
-        self.screenshot_count = screenshot_count
-        self.screenshot_path = screenshot_path
-        self.optimize_screenshot = optimize_screenshot
-        self.create_folder = create_folder
-        self.use_short_bdinfo = use_short_bdinfo
-        self.scan_bdinfo = scan_bdinfo
-        self.image_hosting = image_hosting
-        self.chevereto_hosting_url = chevereto_hosting_url
-        self.imgurl_hosting_url = imgurl_hosting_url
-        self.ptpimg_api_key = ptpimg_api_key
-        self.hdbits_cookie = hdbits_cookie
-        self.hdbits_thumb_size = hdbits_thumb_size
-        self.chevereto_username = chevereto_username
-        self.chevereto_password = chevereto_password
-        self.chevereto_api_key = chevereto_api_key
-        self.cloudinary_cloud_name = cloudinary_cloud_name
-        self.cloudinary_api_key = cloudinary_api_key
-        self.cloudinary_api_secret = cloudinary_api_secret
-        self.imgurl_api_key = imgurl_api_key
-        self.smms_api_key = smms_api_key
-        self.byr_authorization = byr_authorization
-        self.byr_alternative_url = byr_alternative_url
-        self.imgbox_username = imgbox_username
-        self.imgbox_password = imgbox_password
-        self.imgbox_thumbnail_size = imgbox_thumbnail_size
-        self.imgbox_family_safe = imgbox_family_safe
-        self.ptgen_url = ptgen_url
-        self.second_ptgen_url = second_ptgen_url
+
         self.announce_url = announce_url
-        self.ptgen_retry = ptgen_retry
         self.generate_nfo = generate_nfo
         self.make_torrent = make_torrent
         self.easy_upload = easy_upload
@@ -390,14 +350,49 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.reuse_torrent = reuse_torrent
         self.from_torrent = from_torrent
 
-        self.is_bdmv = False
-        self._bdinfo = None
-        self._main_file: Optional[Path] = None
-        self._ptgen: dict = {}
-        self._imdb: dict = {}
-        self._mediainfo: Optional[MediaInfo] = None
-        self._screenshots: list = []
+        self.mediainfo_handler = MediaInfoHandler(
+            folder=self.folder,
+            create_folder=create_folder,
+            use_short_bdinfo=use_short_bdinfo,
+            scan_bdinfo=scan_bdinfo,
+        )
+        self.ptgen_handler = PTGenHandler(
+            url=self.url,
+            ptgen_url=ptgen_url,
+            second_ptgen_url=second_ptgen_url,
+            ptgen_retry=ptgen_retry,
+        )
+        self.screenshot_handler = ScreenshotHandler(
+            folder=self.folder,
+            screenshot_count=screenshot_count,
+            screenshot_path=screenshot_path,
+            optimize_screenshot=optimize_screenshot,
+            image_hosting=image_hosting,
+            chevereto_hosting_url=chevereto_hosting_url,
+            imgurl_hosting_url=imgurl_hosting_url,
+            ptpimg_api_key=ptpimg_api_key,
+            hdbits_cookie=hdbits_cookie,
+            hdbits_thumb_size=hdbits_thumb_size,
+            chevereto_username=chevereto_username,
+            chevereto_password=chevereto_password,
+            chevereto_api_key=chevereto_api_key,
+            cloudinary_cloud_name=cloudinary_cloud_name,
+            cloudinary_api_key=cloudinary_api_key,
+            cloudinary_api_secret=cloudinary_api_secret,
+            imgurl_api_key=imgurl_api_key,
+            smms_api_key=smms_api_key,
+            byr_cookie=byr_cookie,
+            byr_alternative_url=byr_alternative_url,
+            imgbox_username=imgbox_username,
+            imgbox_password=imgbox_password,
+            imgbox_thumbnail_size=imgbox_thumbnail_size,
+            imgbox_family_safe=imgbox_family_safe,
+        )
 
+        self.main_file: Optional[Path] = None
+        self.ptgen: Optional[PTGenData] = None
+        self.douban: Optional[DoubanData] = None
+        self.imdb: Optional[IMDBData] = None
 
     def upload(self):
         self._prepare()
@@ -429,20 +424,18 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 f"描述:\n{self.description}"
             )
 
-
     def _prepare(self):
-        self._mediainfo = self._find_mediainfo()
-
-        ptgen_retry = 2 * self.ptgen_retry
-        self._ptgen = self._get_ptgen()
-        while self._ptgen.get("failed") and ptgen_retry > 0:
-            self._ptgen = self._get_ptgen(ptgen_retry <= self.ptgen_retry)
-            ptgen_retry -= 1
+        self.main_file = self.mediainfo_handler.find_mediainfo()
+        self.ptgen, self.douban, self.imdb = self.ptgen_handler.fetch_ptgen_info()
+        self.screenshot_handler.collect_screenshots(
+            self.main_file,
+            self.mediainfo_handler.resolution,
+            self.mediainfo_handler.duration,
+        )
 
         if self.generate_nfo:
-            self._generate_nfo()
-        if self.screenshot_count > 0:
-            self._screenshots = self._get_screenshots()
+            generate_nfo(self.folder, self.mediainfo_handler.media_info)
+
         if self.make_torrent:
             make_torrent(
                 self.folder,
@@ -451,348 +444,6 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 self.reuse_torrent,
                 self.from_torrent,
             )
-
-    def upload_screenshots(self, img_dir: str) -> list:
-        img_urls = []
-        if (
-            self.image_hosting == ImageHosting.HDB
-            or self.image_hosting == ImageHosting.IMGBOX
-        ):
-            img_urls_file = Path(img_dir).joinpath(
-                ".{}.{}".format(self.image_hosting.value, self.folder.name)
-            )
-            if img_urls_file.is_file():
-                _img_urls = []
-                with open(img_urls_file, "r") as f:
-                    for line in f.readlines():
-                        url, thumb = line.split(" ")
-                        _img_urls.append(ImageUploaded(url, thumb))
-                if len(_img_urls) == len(list(get_all_images(img_dir))):
-                    logger.info(f"发现已上传的{len(_img_urls)}张截图链接")
-                    return _img_urls
-            if self.image_hosting == ImageHosting.HDB:
-                img_urls = hdbits_upload(
-                    sorted(get_all_images(img_dir)),
-                    self.hdbits_cookie,
-                    self.folder.name,
-                    self.hdbits_thumb_size,
-                )
-            elif self.image_hosting == ImageHosting.IMGBOX:
-                img_urls = imgbox_upload(
-                    sorted(get_all_images(img_dir)),
-                    self.imgbox_username,
-                    self.imgbox_password,
-                    self.folder.name,
-                    self.imgbox_thumbnail_size,
-                    self.imgbox_family_safe,
-                    False,
-                )
-            if not img_urls:
-                logger.info("图床上传失败，请自行上传截图：{}".format(img_dir))
-            with open(img_urls_file, "w") as f:
-                for img_url in img_urls:
-                    f.write(f"{img_url.url} {img_url.thumb}\n")
-        else:
-            for count, img in enumerate(sorted(get_all_images(img_dir))):
-                if img.is_file():
-                    img_url = None
-                    img_url_file = img.resolve().parent.joinpath(
-                        ".{}.{}".format(self.image_hosting.value, img.stem)
-                    )
-                    if img_url_file.is_file():
-                        with open(img_url_file, "r") as f:
-                            line = f.read().strip()
-                            if len(line.split(" ")) > 1:
-                                img_url = ImageUploaded(
-                                    line.split(" ")[0], line.split(" ")[1]
-                                )
-                            else:
-                                img_url = ImageUploaded(line)
-                            logger.info(f"发现已上传的第{count + 1}张截图链接：{img_url}")
-                    else:
-                        if self.image_hosting == ImageHosting.PTPIMG:
-                            img_url = ptpimg_upload(img, self.ptpimg_api_key)
-                        elif self.image_hosting == ImageHosting.CHEVERETO:
-                            if not self.chevereto_hosting_url:
-                                logger.error("Chevereto地址未提供，请设置chevereto_hosting_url")
-                                sys.exit(1)
-                            if self.chevereto_hosting_url.endswith("/"):
-                                self.chevereto_hosting_url = self.chevereto_hosting_url[
-                                    :-1
-                                ]
-                            if self.chevereto_api_key:
-                                img_url = chevereto_api_upload(
-                                    img,
-                                    self.chevereto_hosting_url,
-                                    self.chevereto_api_key,
-                                )
-                            elif self.chevereto_username and self.chevereto_password:
-                                img_url = chevereto_username_upload(
-                                    img,
-                                    self.chevereto_hosting_url,
-                                    self.chevereto_username,
-                                    self.chevereto_password,
-                                )
-                            else:
-                                logger.error(
-                                    "Chevereto的API或用户名或密码未设置，请检查chevereto-username/chevereto-password设置"
-                                )
-                        elif self.image_hosting == ImageHosting.CLOUDINARY:
-                            if (
-                                not self.cloudinary_cloud_name
-                                or not self.cloudinary_api_key
-                                or not self.cloudinary_api_secret
-                            ):
-                                logger.error(
-                                    "Cloudinary的参数未设置，请检查cloudinary_cloud_name/cloudinary_api_key/cloudinary_api_secret设置"
-                                )
-                            else:
-                                img_url = cloudinary_upload(
-                                    img,
-                                    self.folder.stem,
-                                    self.cloudinary_cloud_name,
-                                    self.cloudinary_api_key,
-                                    self.cloudinary_api_secret,
-                                )
-                        elif self.image_hosting == ImageHosting.IMGURL:
-                            if self.imgurl_hosting_url.endswith("/"):
-                                self.imgurl_hosting_url = self.imgurl_hosting_url[:-1]
-                            img_url = imgurl_upload(
-                                img, self.imgurl_hosting_url, self.imgurl_api_key
-                            )
-                        elif self.image_hosting == ImageHosting.SMMS:
-                            img_url = smms_upload(img, self.smms_api_key)
-                        elif self.image_hosting == ImageHosting.BYR:
-                            if (
-                                self.byr_alternative_url
-                                and self.byr_alternative_url.endswith("/")
-                            ):
-                                self.byr_alternative_url = self.byr_alternative_url[:-1]
-                            img_url = byr_upload(
-                                img, self.byr_authorization, self.byr_alternative_url
-                            )
-                    if img_url:
-                        logger.info(f"第{count + 1}张截图地址：{img_url.url}")
-                        with open(img_url_file, "w") as f:
-                            if img_url.thumb:
-                                f.write(f"{img_url.url} {img_url.thumb}")
-                            else:
-                                f.write(f"{img_url.url}")
-                        img_urls.append(img_url)
-                    else:
-                        logger.info(f"第{count + 1}张截图上传失败，请自行上传：{img.resolve()}")
-        return img_urls
-
-    def _get_ptgen(self, use_second: bool = False) -> dict:
-        self._imdb = {}
-        ptgen_failed = {"format": "PTGen获取失败，请自行获取相关信息", "failed": True}
-        logger.info(f"正在获取PTGen: {self.url}")
-        params = {"url": self.url}
-        req = requests.get(self.ptgen_url if not use_second else self.second_ptgen_url, params)
-        if not req.ok:
-            logger.trace(req.content)
-            logger.warning(f"获取PTGen失败: HTTP f{req.status_code}, reason: {req.reason}")
-            return ptgen_failed
-        if not req.json().get("success", False):
-            logger.trace(req.json())
-            logger.warning(f"获取PTGen失败: {req.json().get('error', 'Unknown error')}")
-            return ptgen_failed
-
-        # 尝试获取IMDB描述
-        if req.json().get("site") != "imdb":
-            if req.json().get("imdb_link"):
-                imdb_params = {"url": req.json().get("imdb_link")}
-                imdb_req = requests.get(self.ptgen_url, imdb_params)
-                if imdb_req.ok and imdb_req.json().get("success"):
-                    self._imdb = imdb_req.json()
-        else:
-            self._imdb = req.json()
-        logger.info(f"获取PTGen成功 {req.json().get('chinese_title', '')}")
-        return req.json()
-
-    def _get_bdinfo(self) -> str:
-        if not self.scan_bdinfo:
-            logger.info("目标为BDMV，跳过扫描BDInfo")
-            return "[BDINFO HERE]"
-        else:
-            logger.info("目标为BDMV，正在扫描BDInfo...")
-            for f in Path(tempfile.gettempdir()).glob("Differential.bdinfo.*"):
-                if f.is_dir() and self.folder.name in f.name:
-                    if list(f.glob("*.txt")):
-                        temp_dir = f.absolute()
-                        logger.info(
-                            "发现已生成的BDInfo，跳过扫描BDInfo...".format(self.screenshot_count)
-                        )
-                        break
-            else:
-                temp_dir = temp_dir = tempfile.mkdtemp(
-                    prefix="Differential.bdinfo.{}.".format(version),
-                    suffix=self.folder.name,
-                )
-                for f in self.folder.glob("**/BDMV"):
-                    logger.info(f"正在扫描{f.parent}...")
-                    if platform.system() == "Windows":
-                        execute_with_output(
-                            os.path.join(
-                                os.path.dirname(tools.__file__),
-                                "BDinfoCli.0.7.3\BDInfo.exe",
-                            ),
-                            f'-w "{f.parent}" "{temp_dir}"',
-                            abort=True,
-                        )
-                    else:
-                        execute_with_output(
-                            "mono",
-                            f""""{os.path.join(os.path.dirname(tools.__file__), 'BDinfoCli.0.7.3/BDInfo.exe')}" -w """
-                            f'"{f.parent}" "{temp_dir}"',
-                            abort=True,
-                        )
-            bdinfos = []
-            for info in sorted(Path(temp_dir).glob("*.txt")):
-                with info.open("r") as f:
-                    content = f.read()
-                if self.use_short_bdinfo:
-                    m = re.search(r"(QUICK SUMMARY:\n+(.+?\n)+)\n\n", content)
-                    if m:
-                        bdinfos.append(m.groups()[0])
-                else:
-                    m = re.search(
-                        r"(DISC INFO:\n+(.+?\n{1,2})+?)(?:CHAPTERS:\n|STREAM DIAGNOSTICS:\n|\[\/code\]\n<---- END FORUMS PASTE ---->)",
-                        content,
-                    )
-                    if m:
-                        bdinfos.append(m.groups()[0])
-            # shutil.rmtree(temp_dir, ignore_errors=True)
-            return "\n\n".join(bdinfos)
-
-    def _find_mediainfo(self) -> MediaInfo:
-        # Always find the biggest file in the folder
-        logger.info(f"正在获取Mediainfo: {self.folder}")
-        has_bdmv = False
-        if not self.folder.exists() and self.create_folder and "." in str(self.folder):
-            # If file not exist and create_folder is True, try to find the folder with the same name
-            self.folder = self.folder.parent.joinpath(self.folder.stem)
-        if self.folder.is_file():
-            if not self.create_folder:
-                self._main_file = self.folder
-            else:
-                logger.info("目标是文件，正在创建文件夹...")
-                folder = self.folder.parent.joinpath(self.folder.stem)
-                filename = self.folder.name
-                # TODO: decide whether to add exist_ok=True
-                if not folder.is_dir():
-                    os.makedirs(folder)
-                shutil.move(str(self.folder.absolute()), folder)
-                self.folder = folder
-                self._main_file = folder.joinpath(filename)
-        else:
-            logger.info("目标为文件夹，正在获取最大的文件...")
-            biggest_size = -1
-            biggest_file = None
-            for f in self.folder.glob("**/*"):
-                if f.is_file():
-                    if f.suffix == ".bdmv":
-                        has_bdmv = True
-                    s = os.stat(f.absolute()).st_size
-                    if s > biggest_size:
-                        biggest_size = s
-                        biggest_file = f
-            if biggest_file:
-                self._main_file = biggest_file
-        if self._main_file is None:
-            logger.error("未在目标目录找到文件！")
-            sys.exit(1)
-        elif self._main_file.suffix == ".iso":
-            logger.error("请将iso文件挂载后再使用差速器")
-            sys.exit(1)
-        mediainfo = MediaInfo.parse(self._main_file)
-        logger.info(f"已获取Mediainfo: {self._main_file}")
-        logger.trace(mediainfo.to_data())
-        if has_bdmv:
-            self.is_bdmv = True
-            self._bdinfo = self._get_bdinfo()
-        return mediainfo
-
-    def _generate_nfo(self):
-        logger.info("正在生成nfo文件...")
-        if self.folder.is_file():
-            with open(
-                f"{self.folder.resolve().parent.joinpath(self.folder.stem)}.nfo", "wb"
-            ) as f:
-                f.write(self.media_info.encode())
-        elif self.folder.is_dir():
-            with open(self.folder.joinpath(f"{self.folder.name}.nfo"), "wb") as f:
-                f.write(self.media_info.encode())
-
-    def _make_screenshots(self) -> Optional[str]:
-        resolution = get_resolution(self._main_file, self._mediainfo)
-        duration = get_duration(self._mediainfo)
-        if resolution is None or duration is None:
-            return None
-
-        temp_dir = None
-        # 查找已有的截图
-        for f in Path(tempfile.gettempdir()).glob(
-            "Differential.screenshots.{}.*".format(self.image_hosting.value)
-        ):
-            if f.is_dir() and self.folder.name in f.name:
-                if 0 < self.screenshot_count == len(list(f.glob("*.png"))):
-                    temp_dir = f.absolute()
-                    logger.info("发现已生成的{}张截图，跳过截图...".format(self.screenshot_count))
-                    break
-        else:
-            temp_dir = tempfile.mkdtemp(
-                prefix="Differential.screenshots.{}.{}.".format(
-                    self.image_hosting.value, version
-                ),
-                suffix=self.folder.name,
-            )
-            # 生成截图
-            for i in range(1, self.screenshot_count + 1):
-                logger.info(f"正在生成第{i}张截图...")
-                t = int(i * duration / (self.screenshot_count + 1))
-                screenshot_path = (
-                    f"{temp_dir}/{self._main_file.stem}.thumb_{str(i).zfill(2)}.png"
-                )
-                execute(
-                    "ffmpeg",
-                    (
-                        f'-y -ss {t}ms -skip_frame nokey -i "{self._main_file.absolute()}" '
-                        f'-s {resolution} -vsync 0 -vframes 1 -c:v png "{screenshot_path}"'
-                    ),
-                )
-                if self.optimize_screenshot:
-                    image = Image.open(screenshot_path)
-                    image.save(f"{screenshot_path}", format="PNG", optimized=True)
-        return temp_dir
-
-    def _get_screenshots(self) -> list:
-        if self._main_file is None:
-            logger.error("未找到可以被截图的资源，请确认目标目录含有支持的资源!")
-            return []
-
-        if not self.screenshot_path:
-            temp_dir = self._make_screenshots()
-        else:
-            temp_dir = self.screenshot_path
-            images = list(sorted(get_all_images(temp_dir)))
-            if not any(images):
-                logger.warning("未在截图文件夹找到支持的图片文件（jpg、jpeg、png、gif、webp）")
-            else:
-                logger.info(
-                    "发现以下图片文件：\n{}".format("\n".join("- " + i.name for i in images))
-                )
-        if temp_dir is None or not Path(temp_dir).exists():
-            return []
-
-        # 上传截图
-        screenshots = self.upload_screenshots(temp_dir)
-        logger.trace(f"Collected screenshots: {screenshots}")
-
-        # 删除临时文件夹
-        # shutil.rmtree(temp_dir, ignore_errors=True)
-
-        return screenshots
 
     @property
     def parsed_encoder_log(self):
@@ -809,32 +460,13 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def subtitle(self):
-        if not self._ptgen.get("site") == "douban":
-            return ""
-        if "chinese_title" in self._ptgen:
-            subtitle = f"{'/'.join([self._ptgen.get('chinese_title')] + self._ptgen.get('aka', []))}"
-        else:
-            subtitle = f"{'/'.join(self._ptgen.get('aka', []))}"
-        if self._ptgen.get("director"):
-            subtitle += (
-                f"【导演：{'/'.join([d.get('name') for d in self._ptgen.get('director')])}】"
-            )
-        if self._ptgen.get("writer"):
-            subtitle += (
-                f"【编剧：{'/'.join([w.get('name') for w in self._ptgen.get('writer')])}】"
-            )
-        if self._ptgen.get("cast"):
-            subtitle += (
-                f"【主演：{'/'.join([c.get('name') for c in self._ptgen.get('cast')[:3]])}】"
-            )
-        return subtitle
+        if not self.douban:
+            return self.ptgen.subtitle
+        return self.douban.subtitle
 
     @property
     def media_info(self):
-        if self.is_bdmv:
-            return self._bdinfo
-        else:
-            return get_full_mediainfo(self._mediainfo)
+        return self.mediainfo_handler.media_info
 
     @property
     def media_infos(self):
@@ -843,10 +475,12 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     @property
     def description(self):
         return "{}\n\n[quote]{}{}[/quote]\n\n{}".format(
-            self._ptgen.get("format"),
+            self.ptgen.format,
             self.media_info,
             "\n\n" + self.parsed_encoder_log if self.parsed_encoder_log else "",
-            "\n".join([f"{uploaded}" for uploaded in self._screenshots]),
+            "\n".join(
+                [f"{uploaded}" for uploaded in self.screenshot_handler.screenshots]
+            ),
         )
 
     @property
@@ -855,8 +489,8 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def douban_url(self):
-        if self._ptgen.get("site") == "douban":
-            return f"https://movie.douban.com/subject/{self._ptgen.get('sid')}"
+        if self.douban:
+            return f"https://movie.douban.com/subject/{self.douban.sid}"
         return ""
 
     @property
@@ -865,35 +499,37 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def imdb_url(self):
-        return self._ptgen.get("imdb_link", "")
+        return getattr(self.ptgen, "imdb_link", "")
 
     @property
     def screenshots(self):
-        return [u.url for u in self._screenshots]
+        return [u.url for u in self.screenshot_handler.screenshots]
 
     @property
     def poster(self):
-        return self._ptgen.get("poster", "")
+        return getattr(self.ptgen, "poster")
 
     @property
     def year(self):
-        return self._ptgen.get("year", "")
+        return (
+            self.imdb.year
+            if self.imdb
+            else self.douban.year if self.douban else getattr(self.ptgen, "year", "")
+        )
 
     @property
     def category(self):
-        if "演唱会" in self._ptgen.get("tags", []) and "音乐" in self._ptgen.get(
-            "genre", []
-        ):
-            return "concert"
-        imdb_genre = self._imdb.get("genre", [])
-        if "Documentary" in imdb_genre:
-            return "documentary"
-        imdb_type = self._imdb.get("@type", "")
-        if imdb_type == "Movie":
-            return "movie"
-        if imdb_type == "TVSeries":
-            return "tvPack"
-        return imdb_type
+        if self.douban:
+            if "演唱会" in self.douban.genre and "音乐" in self.douban.genre:
+                return "concert"
+        if self.imdb:
+            if "Documentary" in self.imdb.genre:
+                return "documentary"
+            if self.imdb.type_ == DataType.MOVIE:
+                return "movie"
+            if self.imdb.type_ == DataType.TV_SERIES:
+                return "tvPack"
+        return self.ptgen.type_
 
     @property
     def video_type(self):
@@ -911,7 +547,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             return "bluray"
         elif "uhd" in self.folder.name.lower():
             return "uhdbluray"
-        for track in self._mediainfo.tracks:
+        for track in self.mediainfo_handler.tracks:
             if track.track_type == "Video":
                 if track.encoding_settings:
                     return "encode"
@@ -920,7 +556,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     @property
     def format(self):
         # TODO: Maybe read from mediainfo
-        return self._main_file.suffix
+        return self.main_file.suffix
 
     @property
     def source(self):
@@ -928,7 +564,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def video_codec(self):
-        for track in self._mediainfo.tracks:
+        for track in self.mediainfo_handler.mediainfo.tracks:
             if track.track_type == "Video":
                 if track.encoded_library_name:
                     return track.encoded_library_name
@@ -958,7 +594,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             "Dolby TrueHD": "truehd",
             "Dolby TrueHD with Dolby Atmos": "truehd",
         }
-        for track in self._mediainfo.tracks:
+        for track in self.mediainfo_handler.mediainfo.tracks:
             if track.track_type == "Audio":
                 if track.format_info == "Audio Coding 3":
                     return "ac3"
@@ -979,7 +615,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def resolution(self):
-        for track in self._mediainfo.tracks:
+        for track in self.mediainfo_handler.mediainfo.tracks:
             if track.track_type == "Video":
                 if track.height <= 480:
                     return "480p"
@@ -999,32 +635,16 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def area(self):
-        area_map = {
-            "中国大陆": "CN",
-            "中国香港": "HK",
-            "中国台湾": "TW",
-            "美国": "US",
-            "日本": "JP",
-            "韩国": "KR",
-            "印度": "IN",
-            "法国": "FR",
-            "意大利": "IT",
-            "德国": "GE",
-            "西班牙": "ES",
-            "葡萄牙": "PT",
-        }
-        regions = self._ptgen.get("region", [])
-        for area in area_map.keys():
-            if area in regions:
-                return area_map[area]
+        if self.douban:
+            return self.douban.area
         return ""
 
     @property
     def movie_name(self):
-        if self._ptgen.get("site") == "imdb":
-            return self._ptgen.get("name", "")
-        if self._ptgen.get("site") == "douban":
-            return self._ptgen.get("aka", [""])[0]
+        if self.imdb:
+            return self.imdb.name
+        if self.douban:
+            return next(iter(self.douban.aka), "")
         return ""
 
     @property
@@ -1033,7 +653,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     @property
     def size(self):
-        for track in self._mediainfo.tracks:
+        for track in self.mediainfo_handler.tracks:
             if track.track_type == "General":
                 return track.file_size
         return ""
@@ -1041,7 +661,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     @property
     def tags(self):
         tags = {}
-        for track in self._mediainfo.tracks:
+        for track in self.mediainfo_handler.tracks:
             if track.track_type == "General":
                 if track.audio_language_list and "Chinese" in track.audio_language_list:
                     tags["chinese_audio"] = True

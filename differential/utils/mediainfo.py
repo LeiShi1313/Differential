@@ -167,7 +167,7 @@ def get_full_mediainfo(mediainfo: MediaInfo) -> str:
     media_info.strip()
     return media_info
 
-def get_duration(media_info: MediaInfo) -> Optional[Decimal]:
+def get_duration(main_file:Path, media_info: MediaInfo) -> Optional[Decimal]:
     for track in media_info.tracks:
         if track.track_type == "Video":
             return Decimal(track.duration)
@@ -180,7 +180,7 @@ def get_resolution(main_file: Path, media_info: MediaInfo) -> Optional[str]:
     m = re.search(r"Stream.*?Video.*?(\d{2,5})x(\d{2,5})", ffprobe_out)
     if not m:
         logger.debug(ffprobe_out)
-        logger.warning(f"无法获取到视频的分辨率")
+        logger.warning("无法获取到视频的分辨率")
         return None
 
     # 获取视频分辨率以及长度等信息

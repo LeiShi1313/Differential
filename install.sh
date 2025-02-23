@@ -35,10 +35,6 @@ do_install() {
 		debian|raspbian)
 			dist_version="$(sed 's/\/.*//' /etc/debian_version | sed 's/\..*//')"
 			case "$dist_version" in
-				11)
-					# Mono is not available for Debian 11
-					dist_version="buster"
-				;;
 				10)
 					dist_version="buster"
 				;;
@@ -47,6 +43,10 @@ do_install() {
 				;;
 				8)
 					dist_version="jessie"
+				;;
+				*)
+					# Mono is not available starting from Debian 11
+					dist_version="buster"
 				;;
 			esac
 		;;
@@ -180,7 +180,7 @@ do_install() {
 			;;
 		arch)
 			echo "正在安装依赖..." && \
-			$SUDO pacman -Sy --noconfirm vlc python3 python-pip mediainfo 2>&1 > /dev/null
+			$SUDO pacman -Sy --noconfirm vlc python3 python-pip mediainfo mono ffmpeg 2>&1 > /dev/null
 			# TODO cleanup ffmpeg ?
 			echo "正在安装差速器..." && \
 			pip install Differential

@@ -1,15 +1,37 @@
 import re
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import requests
 from loguru import logger
 
+from differential.constants import ImageHosting
 from differential.utils.image.types import ImageUploaded
 
 sessions = {}
 
+def chevereto_upload(images: List[Path], url: Optional[str], api_key: Optional[str], username: Optional[str], password: Optional[str]) -> List[ImageUploaded]:
+    if not url:
+        logger.error("Chevereto地址未提供，请设置chevereto_hosting_url")
+        return []
+
+    if url.endswith("/"):
+        url = url[:-1]
+
+    uploaded = []
+    for img in images:
+        if cached := ImageUploaded.from_pickle(img, ImageHosting.CHEVERETO):
+            uploaded.append(cached)
+        elif api_key:
+            if u := chevereto_api_upload(img, url, api_key):
+                uploaded.append(u)
+        elif username and password:
+            if u := chevereto_username_upload(img, url, username, password):
+                uploaded.append(u)
+        else:
+            logger.error( "Chevereto的API或用户名或密码未设置，请检查chevereto-username/chevereto-password设置")
+    return uploaded
 
 def chevereto_api_upload(img: Path, url: str, api_key: str) -> Optional[ImageUploaded]:
     data = {'key': api_key}
@@ -33,7 +55,7 @@ def chevereto_api_upload(img: Path, url: str, api_key: str) -> Optional[ImageUpl
     if 'image' not in res or 'url' not in res['image']:
         logger.warning(f"图片直链获取失败")
         return None
-    return ImageUploaded(res['image']['url'])
+    return ImageUploaded(hosting=ImageHosting.CHEVERETO, image=img, url=res['image']['url'])
 
 
 def chevereto_cookie_upload(img: Path, url: str, cookie: str, auth_token: str) -> Optional[ImageUploaded]:
@@ -62,7 +84,7 @@ def chevereto_cookie_upload(img: Path, url: str, cookie: str, auth_token: str) -
     if 'image' not in res or 'url' not in res['image']:
         logger.warning(f"图片直链获取失败")
         return None
-    return ImageUploaded(res['image']['url'])
+    return ImageUploaded(hosting=ImageHosting.CHEVERETO, image=img, url=res['image']['url'])
 
 
 def with_session(func):
@@ -114,4 +136,4 @@ def chevereto_username_upload(session: requests.Session, img: Path, url: str, au
     if 'image' not in res or 'url' not in res['image']:
         logger.warning(f"图片直链获取失败")
         return None
-    return ImageUploaded(res['image']['url'])
+    return ImageUploaded(hosting=ImageHosting.CHEVERETO, image=img, url=res['image']['url'])

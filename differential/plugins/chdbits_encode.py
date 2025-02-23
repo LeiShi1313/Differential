@@ -77,20 +77,20 @@ class CHDBitsEncode(CHDBits):
 
     @property
     def subtitle(self):
-        if not self._ptgen.get("site") == "douban":
+        if not self.douban:
             return ""
-        if 'chinese_title' in self._ptgen:
-            return f"{'/'.join([self._ptgen.get('chinese_title')] + self._ptgen.get('aka', []))}"
+        if self.douban.chinese_title:
+            return f"{'/'.join([self.douban.chinese_title] + self.douban.aka)}"
         else:
-            return f"{'/'.join(self._ptgen.get('aka', []))}"
+            return f"{'/'.join(self.douban.aka)}"
 
     @property
     def media_info(self):
-        media_info = f"{self._main_file.stem}\n"
-        imdb_link = self._ptgen.get('imdb_link')
+        media_info = f"{self.main_file.stem}\n"
+        imdb_link = self.imdb.imdb_link
         if imdb_link:
             media_info += f"iMDB URL........: {imdb_link}\n"
-        imdb_rating = self._ptgen.get("imdb_rating")
+        imdb_rating = self.imdb.imdb_rating
         if imdb_rating:
             media_info += f"iMDB RATiNG.....: {imdb_rating}\n"
 
@@ -98,7 +98,7 @@ class CHDBitsEncode(CHDBits):
         if genre:
             media_info += f"GENRE...........: {','.join(genre)}\n"
         else:
-            genre = self._ptgen.get("genre")
+            genre = self.imdb.genre
             if genre:
                 media_info += f"GENRE...........: {','.join(genre)}\n"
 
@@ -169,7 +169,7 @@ class CHDBitsEncode(CHDBits):
             "本站提供的所有影视作品均是在网上搜集任何涉及商业盈利目的均不得使用，"
             "否则产生的一切后果将由您自己承担！本站将不对本站的任何内容负任何法律责任！"
             "该下载内容仅做宽带测试使用，请在下载后24小时内删除。请购买正版！[/b][/color][/quote]".format(
-                self._ptgen.get("format"),
+                self.ptgen.format,
                 self.media_info + "\n\n" + self.parsed_encoder_log,
                 "\n".join([f"{uploaded}" for uploaded in self._screenshots]),
             )
