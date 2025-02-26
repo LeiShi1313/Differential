@@ -137,3 +137,6 @@ test.py
 *.log
 config.ini
 differential/version.py
+
+# windsurf rules
+.windsurfrules
