@@ -1,12 +1,52 @@
-[build-system]
-requires = [
-    "setuptools >= 48",
-    "setuptools_scm[toml] >= 4, <6",
-    "setuptools_scm_git_archive",
-    "wheel >= 0.29.0",
+[project]
+name = "Differential"
+dynamic = ["version"]
+description = "A Python script for easy uploading torrents to various PT sites."
+readme = "README.md"
+authors = [
+    { name = "Lei Shi", email = "me@leishi.io" }
 ]
-build-backend = 'setuptools.build_meta'
+license = { text = "MIT" }
+homepage = "https://github.com/leishi1313/Differential"
+keywords = ["PT", "mediainfo", "ptgen", "ptpimg"]
+classifiers = [
+    "Environment :: Console",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+]
 
-[tool.setuptools_scm]
+requires-python = ">=3.8"
+
+dependencies = [
+    "loguru",
+    "requests",
+    "Pillow>=9.0.0",
+    "pymediainfo>=5.1.0",
+    "torf>=3.1.3",
+    "bencode.py==4.0.0",
+    "lxml>=4.7.1",
+]
+
+[project.scripts]
+differential = "differential.main:main"
+dft = "differential.main:main"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true  # This ensures the package can be built and distributed
+
+[tool.pdm.version]
+source = "scm"
 write_to = "differential/version.py"
-git_describe_command = "git describe --tags --long --first-parent"
+write_template = "version = '{}'"

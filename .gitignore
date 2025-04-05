@@ -106,6 +106,7 @@ celerybeat.pid
 .venv
 env/
 venv/
+.venv/
 ENV/
 env.bak/
 venv.bak/
@@ -137,6 +138,10 @@ test.py
 *.log
 config.ini
 differential/version.py
+.pdm-build/
 
 # windsurf rules
 .windsurfrules
+
+# next release
+gui.py

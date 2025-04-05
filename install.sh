@@ -18,6 +18,14 @@ command_exists() {
 	command -v "$@" > /dev/null 2>&1
 }
 
+reload_path() {
+  for file in ~/.bashrc ~/.bash_profile ~/.profile; do
+  if [ -f "$file" ]; then
+    . "$file"
+  fi
+done
+}
+
 do_install() {
     lsb_dist=$( get_distribution )
 	lsb_dist="$(echo "$lsb_dist" | tr '[:upper:]' '[:lower:]')"
@@ -30,6 +38,21 @@ do_install() {
 			if [ -z "$dist_version" ] && [ -r /etc/lsb-release ]; then
 				dist_version="$(. /etc/lsb-release && echo "$DISTRIB_CODENAME")"
 			fi
+			case "$dist_version" in
+				focal)
+					dist_version="focal"
+				;;
+				bionic)
+					dist_version="bionic"
+				;;
+				xenial)
+					dist_version="xenial"
+				;;
+				*)
+					# Mono is not available starting from Ubuntu 22.04
+					dist_version="focal"
+				;;
+			esac
 		;;
 
 		debian|raspbian)
@@ -51,7 +74,7 @@ do_install() {
 			esac
 		;;
 
-		centos|rhel|sles)
+		centos|rhel|sles|amzn)
 			if [ -z "$dist_version" ] && [ -r /etc/os-release ]; then
 				dist_version="$(. /etc/os-release && echo "$VERSION_ID")"
 			fi
@@ -67,26 +90,22 @@ do_install() {
 		;;
 	esac
 
-	echo $dist_version
     case "$lsb_dist" in
 	    ubuntu | debian | raspbian)
 			echo "正在更新依赖..."
+			export DEBIAN_FRONTEND=noninteractive
 			$SUDO apt-get update -qq >/dev/null
-		    pre_reqs="ffmpeg mediainfo zlib1g-dev libjpeg-dev python3 python3-pip"
+		    pre_reqs="ffmpeg mediainfo zlib1g-dev libjpeg-dev python3 pipx"
 
 			if [ "$lsb_dist" = "ubuntu" ]; then
 				# TODO ubuntu:18.04 Cannot install due to pymediainfo error, might need install newer python
-				case "$dist_version" in
-			    	bionic|focal)
-						$SUDO apt-get install -y -qq gnupg ca-certificates >/dev/null
-						;;
-				esac
-				$SUDO apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-				echo "deb https://download.mono-project.com/repo/ubuntu stable-$dist_version main" | $SUDO tee /etc/apt/sources.list.d/mono-official-stable.list
+				TZ=Etc/UTC $SUDO apt-get install -y -qq gnupg ca-certificates apt-utils >/dev/null
+				$SUDO gpg --homedir /tmp --no-default-keyring --keyring /usr/share/keyrings/mono-official-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+				echo "deb [signed-by=/usr/share/keyrings/mono-official-archive-keyring.gpg] https://download.mono-project.com/repo/ubuntu stable-focal main" | $SUDO tee /etc/apt/sources.list.d/mono-official-stable.list
 			elif [ "$lsb_dist" = "debian" ] || [ "$lsb_dist" = "raspbian" ]; then
-				$SUDO apt-get install -y -qq apt-transport-https dirmngr gnupg ca-certificates >/dev/null
-				$SUDO apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-				echo "deb https://download.mono-project.com/repo/debian stable-$dist_version main" | $SUDO tee /etc/apt/sources.list.d/mono-official-stable.list
+				$SUDO apt-get install -y -qq apt-transport-https dirmngr gnupg ca-certificates apt-utils >/dev/null
+				$SUDO gpg --homedir /tmp --no-default-keyring --keyring /usr/share/keyrings/mono-official-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+				echo "deb [signed-by=/usr/share/keyrings/mono-official-archive-keyring.gpg] https://download.mono-project.com/repo/debian stable-buster main" | $SUDO tee /etc/apt/sources.list.d/mono-official-stable.list
 
 				case "$dist_version" in
 				    stretch|jessie)
@@ -108,23 +127,18 @@ do_install() {
 			echo "正在更新安装包..." && \
 			$SUDO apt-get update -qq >/dev/null && \
 			echo "正在安装依赖..." && \
-			$SUDO apt-get install -y -qq $pre_reqs >/dev/null && \
+			TZ=Etc/UTC $SUDO apt-get install -y -qq $pre_reqs >/dev/null && \
 			echo "正在安装Mono..." && \
-			$SUDO apt-get install -y -qq mono-devel && \
+			$SUDO apt-get install -y -qq mono-devel >/dev/null && \
 			echo "正在安装差速器..."
-			if command_exists pip3; then
-				pip3 install Differential
-			elif command_exists pip; then
-				pip install Differential
-			elif command_exists pip3.8; then
-				pip3.8 install Differential
-			fi
+			$SUDO pipx ensurepath && reload_path
+			pipx install Differential
 			;;
 
 		centos | fedora | rhel)
 			if [ "$lsb_dist" = "fedora" ]; then
 				pkg_manager="dnf"
-				pre_reqs="ffmpeg mediainfo python3 python3-pip"
+				pre_reqs="ffmpeg mediainfo python3 pipx"
 
 				$SUDO rpm --import "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
 				if [[ $dist_version -gt 28 ]]; then
@@ -137,7 +151,7 @@ do_install() {
 				$SUDO $pkg_manager install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm
 			else
 				pkg_manager="yum"
-				pre_reqs="ffmpeg mediainfo python3 python3-pip zlib-devel libjpeg-devel gcc python3-devel"
+				pre_reqs="ffmpeg mediainfo python3 pipx zlib-devel libjpeg-devel gcc python3-devel"
 
 				$SUDO $pkg_manager install -y -qq epel-release
 				case "$dist_version" in
@@ -172,18 +186,16 @@ do_install() {
 			echo "正在安装Mono..." && \
 			$SUDO $pkg_manager install -y mono-devel && \
 			echo "正在安装差速器..."
-			if command_exists pip3; then
-				pip3 install Differential
-			else
-				pip install Differential
-			fi
+			$SUDO pipx ensurepath && reload_path
+			pipx install Differential
 			;;
 		arch)
 			echo "正在安装依赖..." && \
-			$SUDO pacman -Sy --noconfirm vlc python3 python-pip mediainfo mono ffmpeg 2>&1 > /dev/null
+			$SUDO pacman -Sy --noconfirm vlc python3 python-pipx mediainfo mono ffmpeg 2>&1 > /dev/null
 			# TODO cleanup ffmpeg ?
 			echo "正在安装差速器..." && \
-			pip install Differential
+			$SUDO pipx ensurepath && reload_path
+			pipx install Differential
 			;;
 		*)
 			echo "系统版本 $lsb_dist $dist_version 还未支持！"

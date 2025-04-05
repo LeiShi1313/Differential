@@ -46,9 +46,18 @@ pip.exe install Differential
 
 ```shell
 # 安装ffmpeg、mediainfo
-brew install ffmpeg mediainfo
-pip install Differential
+brew install ffmpeg mediainfo pipx
+pipx ensurepath
+pipx install Differential
 ```
+
+## Docker
+
+```shell
+docker pull leishi1313:differential
+docker run --rm -v [你的媒体文件夹]:[媒体文件夹路径] -v ./config.ini:/app/config.ini leishi1313:differential dft -h
+```
+
 
 # 如何使用差速器
 
