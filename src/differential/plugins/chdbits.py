@@ -6,6 +6,10 @@ from differential.plugins.nexusphp import NexusPHP
 class CHDBits(NexusPHP):
 
     @classmethod
+    def get_aliases(cls):
+        return ('chdbits', 'chd')
+
+    @classmethod
     def get_help(cls):
         return 'CHDBits插件，适用于CHDBits'
 

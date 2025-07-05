@@ -4,6 +4,20 @@ import importlib.util
 from pathlib import Path
 from loguru import logger
 
+def _fqname(py_file: Path) -> str:
+    """
+    Build a fully-qualified dotted name that matches the real package
+    (e.g.  differential.plugins.chdbits) so normal 'import' hits the same
+    module object that we create here.
+    """
+    parts = py_file.with_suffix("").parts
+    if "differential" in parts:              # plug-in shipped inside the package
+        start = parts.index("differential")
+        return ".".join(parts[start:])
+    # third-party plug-ins → put them in a unique namespace
+    return f"ext_plugins.{py_file.stem}"
+
+
 def load_plugins_from_dir(directory: Union[str, Path]) -> None:
     """
     Dynamically import all .py files from the given directory,
@@ -34,16 +48,17 @@ def load_plugin_from_file(file_path: Union[str, Path]) -> None:
 
 
 def _import_module_from_file(py_file: Path) -> None:
-    """
-    Helper function to import a Python file via importlib.
-    """
-    try:
-        spec = importlib.util.spec_from_file_location(py_file.stem, py_file)
-        if spec and spec.loader:
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            logger.trace(f"成功导入插件文件: {py_file.name}")
-        else:
-            logger.warning(f"无法加载插件文件: {py_file}")
-    except Exception as e:
-        logger.error(f"错误导入插件文件 '{py_file}': {e}")
+    module_name = _fqname(py_file)
+
+    if module_name in sys.modules:           # already imported → skip
+        logger.trace(f"{module_name} already in sys.modules – skipping")
+        return
+
+    spec = importlib.util.spec_from_file_location(module_name, py_file)
+    module = importlib.util.module_from_spec(spec)
+
+    # Register before executing → later 'import' sees the same object
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+
+    logger.trace(f"Plugin loaded: {module_name}")
