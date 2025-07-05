@@ -100,26 +100,19 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 
 目前支持以下图床：
 
-- **ptpimg**  
-    适用于PTP等站点，需注册账号获取API Key。
+- **ptpimg**: 适用于PTP等站点，需注册账号获取API Key。
 
-- **hdbits**
-    适用于HDB等站点
+- **hdbits**: 适用于HDB等站点
 
-- **chevereto**  
-    支持自建Chevereto图床，需提供图床URL和API信息。
+- **chevereto**: 支持自建Chevereto图床，需提供图床URL和API信息。
 
-- **imgurl**  
-    支持imgurl自建图床，需提供相关API信息。
+- **imgurl**: 支持imgurl自建图床，需提供相关API信息。
 
-- **SM.MS**  
-    免费公共图床，支持API上传。
+- **SM.MS**: 免费公共图床，支持API上传。
 
-- **imgbox**  
-    免费图床.
+- **imgbox**: 免费图床.
 
-- **LKSY**
-    支持兰空LSKY Pro自建图床,可使用API Token或者邮箱密码验证
+- **LKSY**: 支持兰空LSKY Pro自建图床,可使用API Token或者邮箱密码验证
 
 如需使用自建图床，请在配置文件中填写`image_hosting_url`等相关参数。
 
