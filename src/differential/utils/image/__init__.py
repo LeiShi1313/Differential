@@ -9,6 +9,7 @@ from differential.utils.image.ptpimg import ptpimg_upload
 from differential.utils.image.imgurl import imgurl_upload
 from differential.utils.image.chevereto import chevereto_api_upload, chevereto_cookie_upload, chevereto_username_upload, chevereto_upload
 from differential.utils.image.cloudinary import cloudinary_upload
+from differential.utils.image.lsky import lsky_upload
 
 
 

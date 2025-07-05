@@ -229,6 +229,30 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             default=argparse.SUPPRESS,
         )
         parser.add_argument(
+            "--lsky-hosting-url",
+            type=str,
+            help="兰空Lsky Pro图床的地址",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--lsky-token",
+            type=str,
+            help="兰空Lsky Pro图床的API Token，留空则使用邮箱和密码登录",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--lsky-email",
+            type=str,
+            help="兰空Lsky Pro图床的登录邮箱",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--lsky-password",
+            type=str,
+            help="兰空Lsky Pro图床的登录密码",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
             "--ptgen-url", type=str, help="自定义PTGEN的地址", default=argparse.SUPPRESS
         )
         parser.add_argument(
@@ -320,6 +344,10 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         imgbox_password: str = None,
         imgbox_thumbnail_size: str = "300r",
         imgbox_family_safe: bool = True,
+        lsky_hosting_url: str = "",
+        lsky_token: str = None,
+        lsky_email: str = None,
+        lsky_password: str = None,
         ptgen_url: str = "https://ptgen.lgto.workers.dev",
         second_ptgen_url: str = "https://api.slyw.me",
         announce_url: str = "https://example.com",
@@ -387,6 +415,10 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             imgbox_password=imgbox_password,
             imgbox_thumbnail_size=imgbox_thumbnail_size,
             imgbox_family_safe=imgbox_family_safe,
+            lsky_hosting_url=lsky_hosting_url,
+            lsky_token=lsky_token,
+            lsky_email=lsky_email,
+            lsky_password=lsky_password,
         )
 
         self.main_file: Optional[Path] = None

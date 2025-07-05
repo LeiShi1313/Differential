@@ -17,6 +17,7 @@ from differential.utils.image import (
     imgurl_upload,
     chevereto_upload,
     cloudinary_upload,
+    lsky_upload,
 )
 
 class ScreenshotHandler:
@@ -51,6 +52,10 @@ class ScreenshotHandler:
         imgbox_password: str = None,
         imgbox_thumbnail_size: str = "300r",
         imgbox_family_safe: bool = True,
+        lsky_hosting_url: str = "",
+        lsky_token: str = None,
+        lsky_email: str = None,
+        lsky_password: str = None,
     ):
         self.folder = folder
         self.screenshot_count = screenshot_count
@@ -76,6 +81,10 @@ class ScreenshotHandler:
         self.imgbox_password = imgbox_password
         self.imgbox_thumbnail_size = imgbox_thumbnail_size
         self.imgbox_family_safe = imgbox_family_safe
+        self.lsky_hosting_url = lsky_hosting_url
+        self.lsky_token = lsky_token
+        self.lsky_email = lsky_email
+        self.lsky_password = lsky_password
 
         self.screenshots: list = []
 
@@ -174,6 +183,8 @@ class ScreenshotHandler:
             uploaded = smms_upload(images, self.smms_api_key)
         elif self.image_hosting == ImageHosting.BYR:
             uploaded = byr_upload( images, self.byr_cookie, self.byr_alternative_url)
+        elif self.image_hosting == ImageHosting.LSKY:
+            uploaded = lsky_upload(images, self.lsky_hosting_url, self.lsky_token, self.lsky_email, self.lsky_password)
         else:
             logger.error(f"不支持的图片上传方式: {self.image_hosting}")
 

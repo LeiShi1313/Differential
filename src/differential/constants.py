@@ -39,6 +39,7 @@ class ImageHosting(Enum):
     HDB = "hdb"
     IMGBOX = "imgbox"
     CLOUDINARY = "cloudinary"
+    LSKY = "lsky"
 
     @staticmethod
     def parse(s: str):
@@ -60,4 +61,6 @@ class ImageHosting(Enum):
             return ImageHosting.IMGBOX
         elif s.lower() == "cloudinary":
             return ImageHosting.CLOUDINARY
+        elif s.lower() == "lsky":
+            return ImageHosting.LSKY
         raise ValueError(f"不支持的图床：{s}")
