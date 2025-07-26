@@ -561,7 +561,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 return "movie"
             if self.imdb.type_ == DataType.TV_SERIES:
                 return "tvPack"
-        return self.ptgen.type_
+        return ""
 
     @property
     def video_type(self):
