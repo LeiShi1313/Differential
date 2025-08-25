@@ -52,20 +52,19 @@ def lsky_api_upload(img: Path, url: str, token: str) -> Optional[ImageUploaded]:
     logger.info(f"正在上传图片: {img.name}")
     req = requests.post(f"{url}/api/v1/upload", headers=headers, files=files)
 
-    try:
-        res = req.json()
-        logger.trace(res)
-    except json.decoder.JSONDecodeError:
-        res = {}
     if not req.ok:
-        logger.trace(req.content)
+        logger.debug(req.content)
         logger.warning(
-            f"上传图片失败: HTTP {req.status_code}, reason: {req.reason} "
-            f"{res['message'] if 'message' in res else ''}"
+            f"上传图片失败: HTTP {req.status_code}, reason: {req.reason}"
         )
         return None
-    if not res["status"]:
-        logger.warning(f"上传图片失败: {res['message']}")
+    try:
+        res = req.json()
+    except json.decoder.JSONDecodeError:
+        logger.debug(req.content)
+        res = {}
+    if not res.get("status"):
+        logger.warning(f"上传图片失败: {res.get('message', '未知错误')}")
         return None
     if (
         "data" not in res

@@ -139,6 +139,7 @@ test.py
 config.ini
 differential/version.py
 .pdm-build/
+.pdm-python
 
 # windsurf rules
 .windsurfrules
