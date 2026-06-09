@@ -50,6 +50,15 @@ def _finish(action: str, proc: subprocess.CompletedProcess, abort: bool) -> subp
     return proc
 
 
+def run_command(
+    cmd: List[str],
+    *,
+    action: str,
+    abort: bool = True,
+) -> subprocess.CompletedProcess:
+    return _finish(action, _run(cmd, capture=True), abort)
+
+
 def run_with_sudo_fallback(
     cmd: List[str],
     *,
