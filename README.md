@@ -19,7 +19,7 @@
 ## Linux
 
 ### 一键脚本安装
-对于`Debian 9+`/`Ubuntu 20.04+`/`Centos 8`/`Fedora 34+`/`Archlinux`，可以使用一键脚本安装
+对于当前稳定版`Debian`/`Ubuntu`、`Fedora`、`RHEL/CentOS/Rocky/AlmaLinux`以及`Archlinux`，可以使用一键脚本安装。脚本会安装ffmpeg、mediainfo、pipx和原生BDInfoCLI。
 ```shell
 curl -Lso- https://raw.githubusercontent.com/LeiShi1313/Differential/main/install.sh | bash
 ```
@@ -46,13 +46,26 @@ pip.exe install Differential
 ```
 
 ## Mac OS
+
+### 一键脚本安装
+macOS需要先安装[Homebrew](https://brew.sh/)，然后可以使用一键脚本安装。脚本会通过Homebrew安装ffmpeg、mediainfo和pipx，并安装对应CPU架构的原生BDInfoCLI。
 ```shell
-# 安装ffmpeg、mediainfo
+curl -Lso- https://raw.githubusercontent.com/LeiShi1313/Differential/main/install.sh | bash
+```
+
+### 手动安装
+```shell
+# 安装ffmpeg、mediainfo、pipx
 brew install ffmpeg mediainfo pipx
+
+# 安装原生BDInfoCLI，Apple Silicon请把osx-x64替换为osx-arm64
+curl -L -o /tmp/BDInfo-osx-x64.tar.gz https://github.com/tetrahydroc/BDInfoCLI/releases/download/v1.0.5/BDInfo-osx-x64.tar.gz
+tar -xzf /tmp/BDInfo-osx-x64.tar.gz -C /tmp
+sudo install -m 755 /tmp/BDInfo-osx-x64/BDInfo /usr/local/bin/BDInfo
+
 pipx ensurepath
 pipx install Differential
 ```
-原盘BDInfo扫描需要从[BDInfoCLI Releases](https://github.com/tetrahydroc/BDInfoCLI/releases)下载`BDInfo-osx-x64.tar.gz`或`BDInfo-osx-arm64.tar.gz`，并把`BDInfo`放入`PATH`，也可以通过`BDINFOPATH`指定位置。
 
 ## Docker
 
