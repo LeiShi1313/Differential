@@ -25,11 +25,15 @@ curl -Lso- https://raw.githubusercontent.com/LeiShi1313/Differential/main/instal
 ```
 
 ### 手动安装
-按照[这个](https://www.mono-project.com/download/stable/#download-lin)页面，安装Mono
-
 ```shell
 # 安装ffmpeg和mediainfo
-sudo apt install ffmpeg mediainfo zlib1g-dev libjpeg-dev
+sudo apt install ffmpeg mediainfo zlib1g-dev libjpeg-dev curl
+
+# 安装原生BDInfoCLI，ARM64请把linux-x64替换为linux-arm64
+curl -L -o /tmp/BDInfo-linux-x64.tar.gz https://github.com/tetrahydroc/BDInfoCLI/releases/download/v1.0.5/BDInfo-linux-x64.tar.gz
+tar -xzf /tmp/BDInfo-linux-x64.tar.gz -C /tmp
+sudo install -m 755 /tmp/BDInfo-linux-x64/BDInfo /usr/local/bin/BDInfo
+
 pip3 install Differential
 ```
 
@@ -42,14 +46,13 @@ pip.exe install Differential
 ```
 
 ## Mac OS
-按照[这个](https://www.mono-project.com/docs/getting-started/install/mac/)页面，安装Mono
-
 ```shell
 # 安装ffmpeg、mediainfo
 brew install ffmpeg mediainfo pipx
 pipx ensurepath
 pipx install Differential
 ```
+原盘BDInfo扫描需要从[BDInfoCLI Releases](https://github.com/tetrahydroc/BDInfoCLI/releases)下载`BDInfo-osx-x64.tar.gz`或`BDInfo-osx-arm64.tar.gz`，并把`BDInfo`放入`PATH`，也可以通过`BDINFOPATH`指定位置。
 
 ## Docker
 
@@ -81,6 +84,7 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 - `make_torrent`: 是否制种，默认关闭
 - `geenrate_nfo`: 是否利用mediainfo生成nfo文件，默认关闭
 - `use_short_bdinfo`: 是否使用BDInfo的Quick Summary，默认使用完整的BDInfo
+- 原盘BDInfo扫描：Windows使用内置BDInfo；Linux/Mac优先使用`PATH`或`BDINFOPATH`中的原生`BDInfo`，找不到时回退到Mono运行内置BDInfo
 - `screenshot_count`: 截图生成的张数，默认为0，即不生成截图
 - `image_hosting`: 图床的名称，现在支持ptpimg,chevereto,imgurl和SM.MS
 - `image_hosting_url`: 如果是自建的图床，提供图床链接

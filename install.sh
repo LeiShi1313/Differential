@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-SUDO=$(if [ $(id -u $whoami) -gt 0 ]; then echo "sudo "; fi)
+SUDO=$(if [ "$(id -u)" -gt 0 ]; then echo "sudo "; fi)
 
 get_distribution() {
 	lsb_dist=""
@@ -24,6 +24,42 @@ reload_path() {
     . "$file"
   fi
 done
+}
+
+BDINFO_VERSION="${BDINFO_VERSION:-1.0.5}"
+
+install_bdinfo() {
+	if command_exists BDInfo; then
+		echo "BDInfo已安装"
+		return
+	fi
+
+	case "$(uname -m)" in
+		x86_64|amd64)
+			bdinfo_runtime="linux-x64"
+			;;
+		aarch64|arm64)
+			bdinfo_runtime="linux-arm64"
+			;;
+		*)
+			echo "当前架构暂未自动安装BDInfo，请从 https://github.com/tetrahydroc/BDInfoCLI/releases 手动安装"
+			return
+			;;
+	esac
+
+	tmp_dir="$(mktemp -d)"
+	bdinfo_url="https://github.com/tetrahydroc/BDInfoCLI/releases/download/v${BDINFO_VERSION}/BDInfo-${bdinfo_runtime}.tar.gz"
+	echo "正在安装BDInfo ${BDINFO_VERSION}..."
+	curl -fsSL "$bdinfo_url" -o "$tmp_dir/BDInfo.tar.gz"
+	tar -xzf "$tmp_dir/BDInfo.tar.gz" -C "$tmp_dir"
+	bdinfo_binary="$(find "$tmp_dir" -type f -name BDInfo | head -n 1)"
+	if [ -z "$bdinfo_binary" ]; then
+		echo "BDInfo安装包中未找到可执行文件"
+		rm -rf "$tmp_dir"
+		exit 1
+	fi
+	$SUDO install -m 755 "$bdinfo_binary" /usr/local/bin/BDInfo
+	rm -rf "$tmp_dir"
 }
 
 do_install() {
@@ -49,7 +85,6 @@ do_install() {
 					dist_version="xenial"
 				;;
 				*)
-					# Mono is not available starting from Ubuntu 22.04
 					dist_version="focal"
 				;;
 			esac
@@ -68,7 +103,6 @@ do_install() {
 					dist_version="jessie"
 				;;
 				*)
-					# Mono is not available starting from Debian 11
 					dist_version="buster"
 				;;
 			esac
@@ -95,17 +129,13 @@ do_install() {
 			echo "正在更新依赖..."
 			export DEBIAN_FRONTEND=noninteractive
 			$SUDO apt-get update -qq >/dev/null
-		    pre_reqs="ffmpeg mediainfo zlib1g-dev libjpeg-dev python3 pipx"
+		    pre_reqs="ffmpeg mediainfo zlib1g-dev libjpeg-dev python3 pipx curl"
 
 			if [ "$lsb_dist" = "ubuntu" ]; then
 				# TODO ubuntu:18.04 Cannot install due to pymediainfo error, might need install newer python
 				TZ=Etc/UTC $SUDO apt-get install -y -qq gnupg ca-certificates apt-utils >/dev/null
-				$SUDO gpg --homedir /tmp --no-default-keyring --keyring /usr/share/keyrings/mono-official-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-				echo "deb [signed-by=/usr/share/keyrings/mono-official-archive-keyring.gpg] https://download.mono-project.com/repo/ubuntu stable-focal main" | $SUDO tee /etc/apt/sources.list.d/mono-official-stable.list
 			elif [ "$lsb_dist" = "debian" ] || [ "$lsb_dist" = "raspbian" ]; then
 				$SUDO apt-get install -y -qq apt-transport-https dirmngr gnupg ca-certificates apt-utils >/dev/null
-				$SUDO gpg --homedir /tmp --no-default-keyring --keyring /usr/share/keyrings/mono-official-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-				echo "deb [signed-by=/usr/share/keyrings/mono-official-archive-keyring.gpg] https://download.mono-project.com/repo/debian stable-buster main" | $SUDO tee /etc/apt/sources.list.d/mono-official-stable.list
 
 				case "$dist_version" in
 				    stretch|jessie)
@@ -128,8 +158,7 @@ do_install() {
 			$SUDO apt-get update -qq >/dev/null && \
 			echo "正在安装依赖..." && \
 			TZ=Etc/UTC $SUDO apt-get install -y -qq $pre_reqs >/dev/null && \
-			echo "正在安装Mono..." && \
-			$SUDO apt-get install -y -qq mono-devel >/dev/null && \
+			install_bdinfo && \
 			echo "正在安装差速器..."
 			$SUDO pipx ensurepath && reload_path
 			pipx install Differential
@@ -138,20 +167,14 @@ do_install() {
 		centos | fedora | rhel)
 			if [ "$lsb_dist" = "fedora" ]; then
 				pkg_manager="dnf"
-				pre_reqs="ffmpeg mediainfo python3 pipx"
+				pre_reqs="ffmpeg mediainfo python3 pipx curl"
 
-				$SUDO rpm --import "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
-				if [[ $dist_version -gt 28 ]]; then
-					$SUDO su -c "curl https://download.mono-project.com/repo/centos8-stable.repo | $SUDO tee /etc/yum.repos.d/mono-centos8-stable.repo"
-				else
-					$SUDO su -c "curl https://download.mono-project.com/repo/centos7-stable.repo | $SUDO tee /etc/yum.repos.d/mono-centos7-stable.repo"
-				fi
 				$SUDO $pkg_manager install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 				$SUDO $pkg_manager config-manager --enable PowerTools && dnf install --nogpgcheck && \
 				$SUDO $pkg_manager install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm
 			else
 				pkg_manager="yum"
-				pre_reqs="ffmpeg mediainfo python3 pipx zlib-devel libjpeg-devel gcc python3-devel"
+				pre_reqs="ffmpeg mediainfo python3 pipx zlib-devel libjpeg-devel gcc python3-devel curl"
 
 				$SUDO $pkg_manager install -y -qq epel-release
 				case "$dist_version" in
@@ -162,37 +185,33 @@ do_install() {
 						$SUDO dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
 						$SUDO dnf config-manager --set-enabled powertools && \
 						$SUDO dnf -y install mediainfo 2>&1 > /dev/null
-						$SUDO rpmkeys --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
 						$SUDO $pkg_manager install -y https://download1.rpmfusion.org/free/el/rpmfusion-free-release-8.noarch.rpm https://download1.rpmfusion.org/nonfree/el/rpmfusion-nonfree-release-8.noarch.rpm
 						;;
 					7)
 						$SUDO rpm --import http://li.nux.ro/download/nux/RPM-GPG-KEY-nux.ro
 						$SUDO rpm -Uvh http://li.nux.ro/download/nux/dextop/el7/x86_64/nux-dextop-release-0-5.el7.nux.noarch.rpm
-						$SUDO rpmkeys --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"
 						;;
 					6)
 						$SUDO rpm --import http://li.nux.ro/download/nux/RPM-GPG-KEY-nux.ro
 						$SUDO rpm -Uvh http://li.nux.ro/download/nux/dextop/el6/x86_64/nux-dextop-release-0-2.el6.nux.noarch.rpm
-						$SUDO rpm --import "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF"	
 						;;
 				esac
-				$SUDO su -c "curl https://download.mono-project.com/repo/centos$dist_version-stable.repo | $SUDO tee /etc/yum.repos.d/mono-centos$dist_version-stable.repo"
 			fi
 
 			echo "正在更新安装包..." && \
 			$SUDO $pkg_manager update -y -qq > /dev/null && \
 			echo "正在安装依赖..." && \
 			$SUDO $pkg_manager install -y -qq $pre_reqs > /dev/null && \
-			echo "正在安装Mono..." && \
-			$SUDO $pkg_manager install -y mono-devel && \
+			install_bdinfo && \
 			echo "正在安装差速器..."
 			$SUDO pipx ensurepath && reload_path
 			pipx install Differential
 			;;
 		arch)
 			echo "正在安装依赖..." && \
-			$SUDO pacman -Sy --noconfirm vlc python3 python-pipx mediainfo mono ffmpeg 2>&1 > /dev/null
+			$SUDO pacman -Sy --noconfirm vlc python3 python-pipx mediainfo ffmpeg curl > /dev/null 2>&1
 			# TODO cleanup ffmpeg ?
+			install_bdinfo
 			echo "正在安装差速器..." && \
 			$SUDO pipx ensurepath && reload_path
 			pipx install Differential

@@ -4,6 +4,7 @@ import sys
 import platform
 import tempfile
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from loguru import logger
 from typing import Optional, List
@@ -13,6 +14,59 @@ from differential import tools
 from differential.version import version
 from differential.utils.binary import execute_with_output
 from differential.utils.mediainfo import get_full_mediainfo, get_duration, get_resolution
+
+
+BDINFO_ENV_VAR = "BDINFOPATH"
+BDINFO_BINARY_NAMES = ("BDInfo", "bdinfo")
+
+
+def _escape_shell_path(path) -> str:
+    return str(path).replace('"', '\\"')
+
+
+def _bundled_bdinfo_path() -> Path:
+    return Path(tools.__file__).resolve().parent / "BDinfoCli.0.7.3" / "BDInfo.exe"
+
+
+def find_native_bdinfo() -> Optional[Path]:
+    env_path = os.environ.get(BDINFO_ENV_VAR)
+    if env_path:
+        candidate = Path(env_path)
+        if candidate.is_file():
+            return candidate
+        logger.error(f"{candidate}不是可执行文件！")
+        sys.exit(1)
+
+    for name in BDINFO_BINARY_NAMES:
+        cwd_candidate = Path.cwd().joinpath(name)
+        if cwd_candidate.is_file():
+            return cwd_candidate
+
+        which_candidate = shutil.which(name)
+        if which_candidate:
+            return Path(which_candidate)
+
+    return None
+
+
+@dataclass(frozen=True)
+class BDInfoRunner:
+    name: str
+    executable: str
+    use_mono: bool = False
+
+    def run(self, bd_path: Path, report_dir: str) -> None:
+        bd_path_arg = _escape_shell_path(bd_path)
+        report_dir_arg = _escape_shell_path(report_dir)
+
+        if self.use_mono:
+            executable_arg = _escape_shell_path(self.executable)
+            args = f'"{executable_arg}" -w "{bd_path_arg}" "{report_dir_arg}"'
+            execute_with_output("mono", args, abort=True)
+            return
+
+        args = f'-w "{bd_path_arg}" "{report_dir_arg}"'
+        execute_with_output(self.executable, args, abort=True)
 
 
 class MediaInfoHandler:
@@ -153,17 +207,24 @@ class MediaInfoHandler:
         return None
 
     def _run_bdinfo_scan(self, temp_dir: str) -> None:
-        bdinfo_exe = os.path.join(os.path.dirname(tools.__file__), "BDinfoCli.0.7.3", "BDInfo.exe")
+        runner = self._select_bdinfo_runner()
         for bdmv_path in self.folder.glob("**/BDMV"):
             logger.info(f"[BDInfo] 扫描: {bdmv_path.parent}")
-            if platform.system() == "Windows":
-                # path = bdmv_path.parent.replace('"', '\\"')
-                args = f'-w "{bdmv_path.parent}" "{temp_dir}"'
-                execute_with_output(bdinfo_exe, args, abort=True)
-            else:
-                path = bdmv_path.parent.replace('"', '\\"')
-                args = f'"{bdinfo_exe}" -w "{path}" "{temp_dir}"'
-                execute_with_output("mono", args, abort=True)
+            runner.run(bdmv_path.parent, temp_dir)
+
+    def _select_bdinfo_runner(self) -> BDInfoRunner:
+        bundled_bdinfo = _bundled_bdinfo_path()
+        if platform.system() == "Windows":
+            logger.info(f"[BDInfo] 使用内置BDInfo: {bundled_bdinfo}")
+            return BDInfoRunner("bundled", str(bundled_bdinfo))
+
+        native_bdinfo = find_native_bdinfo()
+        if native_bdinfo:
+            logger.info(f"[BDInfo] 使用原生BDInfo: {native_bdinfo}")
+            return BDInfoRunner("native", str(native_bdinfo))
+
+        logger.info("[BDInfo] 未找到原生BDInfo，回退到Mono运行内置BDInfo")
+        return BDInfoRunner("mono", str(bundled_bdinfo), use_mono=True)
 
     def _collect_bdinfo_from_temp(self, temp_dir: str) -> str:
         txt_files = sorted(Path(temp_dir).glob("*.txt"))
