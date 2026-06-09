@@ -7,6 +7,8 @@ from differential.utils.ptgen.base import PTGenData, DataType
 class SteamData(PTGenData):
     """ Dataclass for data returned from steam.js """
     steam_id: Optional[str] = None
+    steam_link: Optional[str] = None
+    cover: Optional[str] = None
     poster: Optional[str] = None
     name: Optional[str] = None
     detail: Optional[str] = None
@@ -32,7 +34,9 @@ class SteamData(PTGenData):
         steam = SteamData(**base.__dict__)
 
         steam.steam_id = obj.get('steam_id')
-        steam.poster = obj.get('poster')
+        steam.steam_link = obj.get('steam_link')
+        steam.cover = obj.get('cover')
+        steam.poster = obj.get('poster') or obj.get('cover')
         steam.name = obj.get('name')
         steam.detail = obj.get('detail')
         steam.tags = obj.get('tags', [])

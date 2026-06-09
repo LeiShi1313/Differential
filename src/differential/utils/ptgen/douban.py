@@ -60,7 +60,7 @@ class DoubanData(PTGenData):
             success=obj.get('success', False),
             error=obj.get('error'),
             format=obj.get('format'),
-            type_=DataType.TV_SERIES if obj.get('episodes', '').isdigit() else DataType.MOVIE
+            type_=DataType.TV_SERIES if str(obj.get('episodes') or '').isdigit() else DataType.MOVIE
         )
         douban = DoubanData(**base.__dict__)
 
