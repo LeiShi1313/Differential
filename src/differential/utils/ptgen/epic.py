@@ -8,6 +8,7 @@ class EpicData(PTGenData):
     """ Dataclass for data returned from epic.js """
     name: Optional[str] = None
     epic_link: Optional[str] = None
+    logo: Optional[str] = None
     desc: Optional[str] = None
     poster: Optional[str] = None
     screenshot: List[str] = field(default_factory=list)
@@ -34,8 +35,9 @@ class EpicData(PTGenData):
 
         epic.name = obj.get('name')
         epic.epic_link = obj.get('epic_link')
+        epic.logo = obj.get('logo')
         epic.desc = obj.get('desc')
-        epic.poster = obj.get('poster')
+        epic.poster = obj.get('poster') or obj.get('logo')
         epic.screenshot = obj.get('screenshot', [])
         epic.language = obj.get('language', [])
         epic.min_req = obj.get('min_req', {})

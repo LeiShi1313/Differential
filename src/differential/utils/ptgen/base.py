@@ -10,10 +10,10 @@ class DataType(Enum):
 
     @classmethod
     def from_str(cls, value: str) -> Optional['DataType']:
-        value = value.lower().strip()
+        value = str(value or "").lower().strip()
         if value in ["movie", "电影"]:
             return cls.MOVIE
-        elif value in ["TVSeries", "tv series", "电视剧", "剧集"]:
+        elif value in ["tvseries", "tv series", "电视剧", "剧集"]:
             return cls.TV_SERIES
         return None
 

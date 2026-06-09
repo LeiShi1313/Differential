@@ -76,7 +76,7 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 - `config`: 配置文件的位置，默认读取当前文件夹下的`config.ini`
 - `log`: log文件的路径
 - `folder`: 种子文件或文件夹的路径
-- `url`: 影片的豆瓣链接，事实上，所有PTGen支持的链接这里都支持
+- `url`: 影片的豆瓣链接，事实上，所有PtGen Archive支持的链接这里都支持，差速器会自动通过Ourhelp CDN、GitHub Pages和Ourhelp API provider获取并生成介绍内容
 - `upload_url`: 发种页面的地址
 - `make_torrent`: 是否制种，默认关闭
 - `geenrate_nfo`: 是否利用mediainfo生成nfo文件，默认关闭
@@ -84,7 +84,6 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 - `screenshot_count`: 截图生成的张数，默认为0，即不生成截图
 - `image_hosting`: 图床的名称，现在支持ptpimg,chevereto,imgurl和SM.MS
 - `image_hosting_url`: 如果是自建的图床，提供图床链接
-- `ptgen_url`: PTGen的地址，默认是我自建的PTGen，可能会不稳定
 - `announce_url`: 制种时的announce地址
 - `encoder_log`: 压制log的地址，如果提供的话会在介绍的mediainfo部分附上压制log
 - `easy_upload`: 默认关闭，开启的话会利用[easy-upload](https://github.com/techmovie/easy-upload)自动填充发种页面表单

@@ -1,22 +1,61 @@
-import requests
 from loguru import logger
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Sequence
 
 from differential.utils.ptgen.base import PTGenData
 from differential.utils.ptgen.imdb import IMDBData
 from differential.utils.ptgen.douban import DoubanData
+from differential.utils.ptgen.formatter import build_ptgen_format
 from differential.utils.ptgen.parser import parse_ptgen
+from differential.utils.ptgen.providers import (
+    DEFAULT_PTGEN_PROVIDERS,
+    PTGenProvider,
+    PTGenProviderError,
+)
+from differential.utils.ptgen.reference import PTGenReference, parse_ptgen_reference
+
+import requests
+
+
+FAILURE_FORMAT = "PTGen获取失败，请自行获取相关内容"
+
+
+def normalize_ptgen_payload(data: Dict[str, Any], reference: PTGenReference) -> Dict[str, Any]:
+    if not isinstance(data, dict):
+        raise PTGenProviderError("provider returned non-object JSON")
+
+    payload = dict(data)
+    site = str(payload.get("site") or reference.site)
+    sid = str(payload.get("sid") or reference.sid)
+
+    if site != reference.site or sid != reference.sid:
+        raise PTGenProviderError(
+            f"provider returned mismatched data: expected {reference.site}/{reference.sid}, got {site}/{sid}"
+        )
+
+    if payload.get("success") is False:
+        raise PTGenProviderError(payload.get("error") or "provider returned success=false")
+
+    payload["site"] = site
+    payload["sid"] = sid
+    payload["success"] = True if payload.get("success") is None else payload["success"]
+    payload["format"] = build_ptgen_format(payload)
+    return payload
 
 class PTGenHandler:
     """
-    Handles fetching information from PTGen (and optionally IMDB).
+    Handles fetching information from PtGen archive providers.
     """
 
-    def __init__(self, url: str, ptgen_url: str, second_ptgen_url: str, ptgen_retry: int):
+    def __init__(
+        self,
+        url: str,
+        providers: Sequence[PTGenProvider] = DEFAULT_PTGEN_PROVIDERS,
+        timeout: int = 15,
+    ):
         self.url = url
-        self.ptgen_url = ptgen_url
-        self.second_ptgen_url = second_ptgen_url
-        self.ptgen_retry = ptgen_retry
+        self.providers = tuple(providers)
+        self.timeout = timeout
+        self.session = requests.Session()
 
         self._ptgen: Optional[PTGenData] = None
         self._douban: Optional[DoubanData] = None
@@ -24,60 +63,76 @@ class PTGenHandler:
 
     def fetch_ptgen_info(self):
         """
-        Public method to fetch PTGen (and optional IMDB) data,
-        with retry logic switching between ptgen_url and second_ptgen_url.
+        Public method to fetch PtGen data and optional IMDB data.
         """
-        attempts_left = 2 * self.ptgen_retry
-        while attempts_left > 0:
-            use_second = attempts_left <= self.ptgen_retry
-            self._ptgen = self._request_ptgen_info(use_second=use_second)
-            if self._ptgen.success:
-                return (self._ptgen, self._douban, self._imdb)
-            attempts_left -= 1
+        reference = parse_ptgen_reference(self.url)
+        if not reference:
+            self._ptgen = PTGenData(
+                success=False,
+                error=f"不支持的PTGen链接: {self.url}",
+                format=FAILURE_FORMAT,
+            )
+            logger.warning(f"[PTGen] 不支持的链接: {self.url}")
+            return (self._ptgen, self._douban, self._imdb)
 
+        self._ptgen = self._request_ptgen_info(reference)
+        if self._ptgen.success:
+            if self._ptgen.site != "imdb":
+                if self._ptgen.site == "douban":
+                    self._douban = self._ptgen
+                imdb_link = getattr(self._ptgen, "imdb_link", None)
+                if imdb_link:
+                    self._imdb = self._try_fetch_imdb(imdb_link)
+            else:
+                self._imdb = self._ptgen
         return (self._ptgen, self._douban, self._imdb)
 
-    def _request_ptgen_info(self, use_second: bool = False) -> PTGenData:
-        ptgen_url = self.second_ptgen_url if use_second else self.ptgen_url
-        logger.debug(f"[PTGen] 正在从 {ptgen_url} 获取 {self.url}")
-        params = {"url": self.url}
+    def _request_ptgen_info(self, reference: PTGenReference) -> PTGenData:
+        last_error = ""
+        for provider in self.providers:
+            logger.debug(
+                f"[PTGen] 正在从 {provider.name} 获取 {reference.site}/{reference.sid}"
+            )
+            try:
+                raw_data = provider.fetch(reference, self.session, self.timeout)
+                payload = normalize_ptgen_payload(raw_data, reference)
+                ptgen = parse_ptgen(payload)
+                if not ptgen.success:
+                    last_error = ptgen.error or "PTGen解析失败"
+                    logger.warning(f"[PTGen] {provider.name} 获取失败: {last_error}")
+                    continue
 
-        try:
-            resp = requests.get(ptgen_url, params=params, timeout=15)
-            if not resp.ok:
-                logger.trace(resp.content)
-                logger.warning(f"[PTGen] HTTP {resp.status_code} - {resp.reason}")
-                return PTGenData()
-
-            ptgen = parse_ptgen(resp.json())
-            if not ptgen.success:
-                logger.trace(resp.json())
-                logger.warning(f"[PTGen] 获取失败: {ptgen.error}")
+                logger.info(f"[PTGen] {provider.name} 获取成功: {ptgen}")
                 return ptgen
-            
-            if ptgen.site != "imdb":
-                if ptgen.site == 'douban':
-                    self._douban = ptgen
-                if hasattr(ptgen, "imdb_link"):
-                    self._imdb = self._try_fetch_imdb(ptgen.imdb_link)
-            else:
-                self._imdb = ptgen
+            except Exception as e:
+                last_error = str(e)
+                logger.warning(f"[PTGen] {provider.name} 获取失败: {last_error}")
 
-            logger.info(f"[PTGen] 获取成功: {ptgen}")
-            return ptgen
-        except requests.RequestException as e:
-            logger.warning(f"[PTGen] 请求异常: {e}")
-            return PTGenData()
+        return PTGenData(
+            site=reference.site,
+            sid=reference.sid,
+            success=False,
+            error=last_error or "所有PTGen provider均获取失败",
+            format=FAILURE_FORMAT,
+        )
 
     def _try_fetch_imdb(self, imdb_link: str) -> IMDBData:
         """
-        Attempt to fetch IMDB info from PTGen for the provided IMDB link.
-        Returns a dict or empty if failed.
+        Attempt to fetch IMDB info from PtGen providers for the provided IMDB link.
         """
-        try:
-            req = requests.get(self.ptgen_url, params={"url": imdb_link}, timeout=15)
-            if req.ok and req.json().get("success"):
-                return IMDBData.from_dict(req.json())
-        except Exception as e:
-            logger.warning(f"[IMDB] 请求异常: {e}")
-        return IMDBData()
+        reference = parse_ptgen_reference(imdb_link)
+        if not reference:
+            logger.warning(f"[IMDB] 不支持的链接: {imdb_link}")
+            return IMDBData(format=FAILURE_FORMAT)
+
+        ptgen = self._request_ptgen_info(reference)
+        if isinstance(ptgen, IMDBData):
+            return ptgen
+
+        return IMDBData(
+            site=reference.site,
+            sid=reference.sid,
+            success=False,
+            error=ptgen.error,
+            format=ptgen.format or FAILURE_FORMAT,
+        )

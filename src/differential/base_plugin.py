@@ -253,15 +253,6 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             default=argparse.SUPPRESS,
         )
         parser.add_argument(
-            "--ptgen-url", type=str, help="自定义PTGEN的地址", default=argparse.SUPPRESS
-        )
-        parser.add_argument(
-            "--ptgen-retry",
-            type=int,
-            help="PTGEN重试次数，默认为3次",
-            default=argparse.SUPPRESS,
-        )
-        parser.add_argument(
             "--announce-url",
             type=str,
             help="制种时announce地址",
@@ -348,10 +339,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         lsky_token: str = None,
         lsky_email: str = None,
         lsky_password: str = None,
-        ptgen_url: str = "https://ptgen.lgto.workers.dev",
-        second_ptgen_url: str = "https://api.slyw.me",
         announce_url: str = "https://example.com",
-        ptgen_retry: int = 3,
         generate_nfo: bool = False,
         make_torrent: bool = False,
         easy_upload: bool = False,
@@ -386,9 +374,6 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         )
         self.ptgen_handler = PTGenHandler(
             url=self.url,
-            ptgen_url=ptgen_url,
-            second_ptgen_url=second_ptgen_url,
-            ptgen_retry=ptgen_retry,
         )
         self.screenshot_handler = ScreenshotHandler(
             folder=self.folder,

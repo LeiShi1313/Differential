@@ -43,7 +43,7 @@ class IndienovaData(PTGenData):
         indienova = IndienovaData(**base.__dict__)
 
         indienova.cover = obj.get('cover')
-        indienova.poster = obj.get('poster')
+        indienova.poster = obj.get('poster') or obj.get('cover')
         indienova.chinese_title = obj.get('chinese_title')
         indienova.another_title = obj.get('another_title')
         indienova.english_title = obj.get('english_title')
