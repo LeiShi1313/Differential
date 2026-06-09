@@ -56,26 +56,26 @@ def build_cmd(binary_name: str, args: str, abort: bool = False) -> str:
 
 def execute_with_output(binary_name: str, args: str, abort: bool = False) -> int:
     cmd = build_cmd(binary_name, args, abort)
-    return_code = 0
+    if not cmd:
+        return 1
 
-    def _execute():
-        proc = subprocess.Popen(cmd, shell=True, bufsize=1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                     universal_newlines=True)
-        for stdout in iter(proc.stdout.readline, ""):
-            yield stdout
-        proc.stdout.close()
-        return_code = proc.wait()
+    proc = subprocess.Popen(cmd, shell=True, bufsize=1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 universal_newlines=True)
     prev = ''
-    for out in iter(_execute()):
+    for out in iter(proc.stdout.readline, ""):
         out = out.strip()
-        if re.sub('(\d| )', '', out) != re.sub('(\d| )', '', prev):
+        if re.sub(r'(\d| )', '', out) != re.sub(r'(\d| )', '', prev):
             print(out)
         else:
             print(out, end='\r')
         sys.stdout.flush()
         prev = out
+    proc.stdout.close()
+    return_code = proc.wait()
     if return_code != 0:
         logger.warning(f"{binary_name} exit with return code {return_code}")
+        if abort:
+            sys.exit(return_code)
     return return_code
     
 

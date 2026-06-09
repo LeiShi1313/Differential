@@ -412,34 +412,37 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         self.imdb: Optional[IMDBData] = None
 
     def upload(self):
-        self._prepare()
-        if self.easy_upload:
-            torrent_info = self.easy_upload_torrent_info
-            if self.trim_description:
-                # 直接打印简介部分来绕过浏览器的链接长度限制
-                torrent_info["description"] = ""
-            logger.trace(f"torrent_info: {torrent_info}")
-            link = f"{self.upload_url}#torrentInfo={quote(json.dumps(torrent_info))}"
-            logger.trace(f"已生成自动上传链接：{link}")
-            if self.trim_description:
-                logger.info(f"种子描述：\n{self.description}")
-            open_link(link, self.use_short_url)
-        elif self.auto_feed:
-            link = f"{self.upload_url}#{self.auto_feed_info}"
-            # if self.trim_description:
-            #     logger.info(f"种子描述：\n{self.description}")
-            logger.trace(f"已生成自动上传链接：{link}")
-            open_link(link, self.use_short_url)
-        else:
-            logger.info(
-                "\n"
-                f"标题: {self.title}\n"
-                f"副标题: {self.subtitle}\n"
-                f"豆瓣: {self.douban_url}\n"
-                f"IMDB: {self.imdb_url}\n"
-                f"视频编码: {self.video_codec} 音频编码: {self.audio_codec} 分辨率: {self.resolution}\n"
-                f"描述:\n{self.description}"
-            )
+        try:
+            self._prepare()
+            if self.easy_upload:
+                torrent_info = self.easy_upload_torrent_info
+                if self.trim_description:
+                    # 直接打印简介部分来绕过浏览器的链接长度限制
+                    torrent_info["description"] = ""
+                logger.trace(f"torrent_info: {torrent_info}")
+                link = f"{self.upload_url}#torrentInfo={quote(json.dumps(torrent_info))}"
+                logger.trace(f"已生成自动上传链接：{link}")
+                if self.trim_description:
+                    logger.info(f"种子描述：\n{self.description}")
+                open_link(link, self.use_short_url)
+            elif self.auto_feed:
+                link = f"{self.upload_url}#{self.auto_feed_info}"
+                # if self.trim_description:
+                #     logger.info(f"种子描述：\n{self.description}")
+                logger.trace(f"已生成自动上传链接：{link}")
+                open_link(link, self.use_short_url)
+            else:
+                logger.info(
+                    "\n"
+                    f"标题: {self.title}\n"
+                    f"副标题: {self.subtitle}\n"
+                    f"豆瓣: {self.douban_url}\n"
+                    f"IMDB: {self.imdb_url}\n"
+                    f"视频编码: {self.video_codec} 音频编码: {self.audio_codec} 分辨率: {self.resolution}\n"
+                    f"描述:\n{self.description}"
+                )
+        finally:
+            self.mediainfo_handler.cleanup()
 
     def _prepare(self):
         self.main_file = self.mediainfo_handler.find_mediainfo()

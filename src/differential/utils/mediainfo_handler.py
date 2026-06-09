@@ -1,9 +1,11 @@
+import glob
 import os
 import re
 import sys
 import platform
 import tempfile
 import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from loguru import logger
@@ -14,6 +16,7 @@ from differential import tools
 from differential.version import version
 from differential.utils.binary import execute_with_output
 from differential.utils.mediainfo import get_full_mediainfo, get_duration, get_resolution
+from differential.utils.privilege import run_with_sudo_fallback
 
 
 BDINFO_ENV_VAR = "BDINFOPATH"
@@ -84,13 +87,18 @@ class MediaInfoHandler:
         scan_bdinfo: bool,
     ):
         self.folder = folder
+        self.original_folder = folder
         self.create_folder = create_folder
         self.use_short_bdinfo = use_short_bdinfo
         self.scan_bdinfo = scan_bdinfo
+        self.media_name = self._media_name(folder)
+        self.cache_key = self._sanitize_name(self.media_name)
 
         self.is_bdmv = False
         self.bdinfo = None
         self.main_file = None
+        self.iso_mount_dir: Optional[Path] = None
+        self.iso_mount_parent: Optional[Path] = None
 
     def find_mediainfo(self):
         """
@@ -103,6 +111,9 @@ class MediaInfoHandler:
         Returns (MediaInfo, BDInfo, main_file, is_bdmv).
         """
         logger.info(f"正在获取Mediainfo: {self.folder}")
+        if self.folder.is_file() and self.folder.suffix.lower() == ".iso":
+            self._mount_iso()
+
         self._handle_single_or_folder()
         if not self.main_file:
             logger.error("未找到可分析的文件，请确认路径。")
@@ -124,6 +135,71 @@ class MediaInfoHandler:
                 self.bdinfo = "[BDINFO HERE]"
 
         return self.main_file
+
+    def cleanup(self) -> None:
+        if not self.iso_mount_dir:
+            return
+
+        if self._is_mountpoint(self.iso_mount_dir):
+            run_with_sudo_fallback(
+                ["umount", "--", str(self.iso_mount_dir)],
+                action=f"卸载ISO: {self.iso_mount_dir}",
+                abort=False,
+            )
+
+        if self._is_mountpoint(self.iso_mount_dir):
+            logger.warning(f"[ISO] 未能卸载挂载点，请手动检查: {self.iso_mount_dir}")
+            return
+
+        for path in (self.iso_mount_dir, self.iso_mount_parent):
+            if path and path.exists():
+                try:
+                    path.rmdir()
+                except OSError as e:
+                    logger.warning(f"[ISO] 清理临时目录失败: {path}: {e}")
+
+        self.iso_mount_dir = None
+        self.iso_mount_parent = None
+
+    @staticmethod
+    def _media_name(folder: Path) -> str:
+        return folder.stem if folder.is_file() else folder.name
+
+    @staticmethod
+    def _sanitize_name(name: str) -> str:
+        sanitized = re.sub(r"[^\w .@+-]+", "_", name, flags=re.UNICODE).strip(" ._")
+        sanitized = re.sub(r"_+", "_", sanitized)
+        return sanitized[:120] or "media"
+
+    @staticmethod
+    def _is_mountpoint(path: Path) -> bool:
+        if shutil.which("mountpoint"):
+            return subprocess.run(["mountpoint", "-q", str(path)]).returncode == 0
+        if shutil.which("findmnt"):
+            return subprocess.run(
+                ["findmnt", "-rn", "--mountpoint", str(path)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            ).returncode == 0
+        return False
+
+    def _mount_iso(self) -> None:
+        if platform.system() != "Linux":
+            logger.error("请先挂载ISO文件再使用。")
+            sys.exit(1)
+
+        self.iso_mount_parent = Path(tempfile.mkdtemp(prefix=f"Differential.iso.{version}."))
+        self.iso_mount_dir = self.iso_mount_parent.joinpath(self.cache_key)
+        self.iso_mount_dir.mkdir()
+
+        logger.info(f"[ISO] 正在挂载ISO: {self.original_folder}")
+        run_with_sudo_fallback(
+            ["mount", "-o", "ro,loop", "--", str(self.original_folder.resolve()), str(self.iso_mount_dir)],
+            action=f"挂载ISO: {self.original_folder}",
+            abort=True,
+        )
+        self.folder = self.iso_mount_dir
+        logger.info(f"[ISO] 已挂载到: {self.folder}")
 
     @property
     def media_info(self):
@@ -192,15 +268,16 @@ class MediaInfoHandler:
             return cached
 
         # Otherwise, run BDInfo scanning
-        temp_dir = tempfile.mkdtemp(prefix=f"Differential.bdinfo.{version}.", suffix=f".{self.folder.name}")
+        temp_dir = tempfile.mkdtemp(prefix=f"Differential.bdinfo.{version}.", suffix=f".{self.cache_key}")
         self._run_bdinfo_scan(temp_dir)
         return self._collect_bdinfo_from_temp(temp_dir)
 
     def _find_cached_bdinfo(self) -> Optional[str]:
         """
-        Look in the temp dir for an existing BDInfo scan matching self.folder.name.
+        Look in the temp dir for an existing BDInfo scan matching this media.
         """
-        for d in Path(tempfile.gettempdir()).glob(f"Differential.bdinfo.{version}.*.{self.folder.name}"):
+        pattern = f"Differential.bdinfo.{glob.escape(version)}.*.{glob.escape(self.cache_key)}"
+        for d in (Path(p) for p in glob.glob(str(Path(tempfile.gettempdir()).joinpath(pattern)))):
             if d.is_dir():
                 if txt_files := list(d.glob("*.txt")):
                     return self._extract_bdinfo_content(txt_files)
@@ -239,7 +316,7 @@ class MediaInfoHandler:
             content = txt.read_text(errors="ignore")
             if self.use_short_bdinfo:
                 # Extract QUICK SUMMARY
-                if m := re.search(r"(QUICK SUMMARY:\n+(.+?\n)+)\n\n", content):
+                if m := re.search(r"(QUICK SUMMARY:\r?\n+(?:[^\r\n].*(?:\r?\n|$))+)", content):
                     bdinfos.append(m.group(1))
             else:
                 # Extract DISC INFO
