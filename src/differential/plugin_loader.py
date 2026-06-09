@@ -12,7 +12,7 @@ def _fqname(py_file: Path) -> str:
     """
     parts = py_file.with_suffix("").parts
     if "differential" in parts:              # plug-in shipped inside the package
-        start = parts.index("differential")
+        start = len(parts) - 1 - parts[::-1].index("differential")
         return ".".join(parts[start:])
     # third-party plug-ins → put them in a unique namespace
     return f"ext_plugins.{py_file.stem}"
