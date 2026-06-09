@@ -16,7 +16,7 @@ from differential import tools
 from differential.version import version
 from differential.utils.binary import execute_with_output
 from differential.utils.mediainfo import get_full_mediainfo, get_duration, get_resolution
-from differential.utils.privilege import run_with_sudo_fallback
+from differential.utils.privilege import run_command, run_with_sudo_fallback
 
 
 BDINFO_ENV_VAR = "BDINFOPATH"
@@ -99,6 +99,7 @@ class MediaInfoHandler:
         self.main_file = None
         self.iso_mount_dir: Optional[Path] = None
         self.iso_mount_parent: Optional[Path] = None
+        self.iso_mount_platform: Optional[str] = None
 
     def find_mediainfo(self):
         """
@@ -140,7 +141,19 @@ class MediaInfoHandler:
         if not self.iso_mount_dir:
             return
 
-        if self._is_mountpoint(self.iso_mount_dir):
+        if self.iso_mount_platform == "Darwin":
+            detached = (
+                run_command(
+                    ["hdiutil", "detach", str(self.iso_mount_dir)],
+                    action=f"卸载ISO: {self.iso_mount_dir}",
+                    abort=False,
+                ).returncode
+                == 0
+            )
+            if not detached:
+                logger.warning(f"[ISO] 未能卸载挂载点，请手动检查: {self.iso_mount_dir}")
+                return
+        elif self._is_mountpoint(self.iso_mount_dir):
             run_with_sudo_fallback(
                 ["umount", "--", str(self.iso_mount_dir)],
                 action=f"卸载ISO: {self.iso_mount_dir}",
@@ -160,6 +173,7 @@ class MediaInfoHandler:
 
         self.iso_mount_dir = None
         self.iso_mount_parent = None
+        self.iso_mount_platform = None
 
     @staticmethod
     def _media_name(folder: Path) -> str:
@@ -184,7 +198,8 @@ class MediaInfoHandler:
         return False
 
     def _mount_iso(self) -> None:
-        if platform.system() != "Linux":
+        system = platform.system()
+        if system not in ("Linux", "Darwin"):
             logger.error("请先挂载ISO文件再使用。")
             sys.exit(1)
 
@@ -193,11 +208,27 @@ class MediaInfoHandler:
         self.iso_mount_dir.mkdir()
 
         logger.info(f"[ISO] 正在挂载ISO: {self.original_folder}")
-        run_with_sudo_fallback(
-            ["mount", "-o", "ro,loop", "--", str(self.original_folder.resolve()), str(self.iso_mount_dir)],
-            action=f"挂载ISO: {self.original_folder}",
-            abort=True,
-        )
+        if system == "Darwin":
+            run_command(
+                [
+                    "hdiutil",
+                    "attach",
+                    "-readonly",
+                    "-nobrowse",
+                    "-mountpoint",
+                    str(self.iso_mount_dir),
+                    str(self.original_folder.resolve()),
+                ],
+                action=f"挂载ISO: {self.original_folder}",
+                abort=True,
+            )
+        else:
+            run_with_sudo_fallback(
+                ["mount", "-o", "ro,loop", "--", str(self.original_folder.resolve()), str(self.iso_mount_dir)],
+                action=f"挂载ISO: {self.original_folder}",
+                abort=True,
+            )
+        self.iso_mount_platform = system
         self.folder = self.iso_mount_dir
         logger.info(f"[ISO] 已挂载到: {self.folder}")
 

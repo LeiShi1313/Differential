@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from differential.base_plugin import Base
 from differential.utils.mediainfo_handler import MediaInfoHandler
-from differential.utils.privilege import run_with_sudo_fallback
+from differential.utils.privilege import run_command, run_with_sudo_fallback
 from differential.version import version
 
 
@@ -21,6 +21,22 @@ def completed(cmd, returncode=0, stdout="", stderr=""):
 
 
 class PrivilegeHelperTest(unittest.TestCase):
+    def test_run_command_returns_direct_success(self):
+        with mock.patch("subprocess.run", return_value=completed(["hdiutil"])) as run:
+            proc = run_command(["hdiutil"], action="hdiutil test")
+
+        self.assertEqual(proc.returncode, 0)
+        run.assert_called_once_with(["hdiutil"], text=True, capture_output=True)
+
+    def test_run_command_returns_failure_without_abort(self):
+        with mock.patch(
+            "subprocess.run",
+            return_value=completed(["hdiutil"], returncode=1, stderr="detach failed"),
+        ):
+            proc = run_command(["hdiutil"], action="hdiutil test", abort=False)
+
+        self.assertEqual(proc.returncode, 1)
+
     def test_run_with_sudo_fallback_uses_direct_success(self):
         with mock.patch("subprocess.run", return_value=completed(["mount"])) as run:
             proc = run_with_sudo_fallback(["mount"], action="mount test")
@@ -158,7 +174,69 @@ class MediaInfoIsoMountTest(unittest.TestCase):
             )
             self.assertEqual(handler.folder, expected_mount_dir)
 
-    def test_mount_iso_exits_on_non_linux(self):
+    def test_mount_iso_uses_hdiutil_attach_on_macos(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            iso = root / "-leading-dash.iso"
+            iso.write_bytes(b"iso")
+            mount_parent = root / "mount-parent"
+            mount_parent.mkdir()
+            handler = MediaInfoHandler(iso, False, False, True)
+
+            with mock.patch(
+                "differential.utils.mediainfo_handler.platform.system",
+                return_value="Darwin",
+            ), mock.patch(
+                "differential.utils.mediainfo_handler.tempfile.mkdtemp",
+                return_value=str(mount_parent),
+            ), mock.patch(
+                "differential.utils.mediainfo_handler.run_command",
+                return_value=completed(["hdiutil"]),
+            ) as run:
+                handler._mount_iso()
+
+            expected_mount_dir = mount_parent / handler.cache_key
+            run.assert_called_once_with(
+                [
+                    "hdiutil",
+                    "attach",
+                    "-readonly",
+                    "-nobrowse",
+                    "-mountpoint",
+                    str(expected_mount_dir),
+                    str(iso.resolve()),
+                ],
+                action=f"挂载ISO: {iso}",
+                abort=True,
+            )
+            self.assertEqual(handler.folder, expected_mount_dir)
+            self.assertEqual(handler.iso_mount_platform, "Darwin")
+
+    def test_cleanup_detaches_macos_iso_and_removes_temp_mount_dirs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = Path(tmp) / "iso-parent"
+            mount_dir = parent / "movie"
+            mount_dir.mkdir(parents=True)
+            handler = MediaInfoHandler(mount_dir / "movie.iso", False, False, True)
+            handler.iso_mount_parent = parent
+            handler.iso_mount_dir = mount_dir
+            handler.iso_mount_platform = "Darwin"
+
+            with mock.patch(
+                "differential.utils.mediainfo_handler.run_command",
+                return_value=completed(["hdiutil"]),
+            ) as run, mock.patch.object(handler, "_is_mountpoint", return_value=False):
+                handler.cleanup()
+
+            run.assert_called_once_with(
+                ["hdiutil", "detach", str(mount_dir)],
+                action=f"卸载ISO: {mount_dir}",
+                abort=False,
+            )
+            self.assertFalse(parent.exists())
+            self.assertIsNone(handler.iso_mount_platform)
+
+    def test_mount_iso_exits_on_unsupported_platform(self):
         with tempfile.TemporaryDirectory() as tmp:
             iso = Path(tmp) / "Movie.iso"
             iso.write_bytes(b"iso")
@@ -166,7 +244,7 @@ class MediaInfoIsoMountTest(unittest.TestCase):
 
             with mock.patch(
                 "differential.utils.mediainfo_handler.platform.system",
-                return_value="Darwin",
+                return_value="Windows",
             ), self.assertRaises(SystemExit):
                 handler._mount_iso()
 
