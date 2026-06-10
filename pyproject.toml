@@ -7,7 +7,6 @@ authors = [
     { name = "Lei Shi", email = "me@leishi.io" }
 ]
 license = { text = "MIT" }
-homepage = "https://github.com/leishi1313/Differential"
 keywords = ["PT", "mediainfo", "ptgen", "ptpimg"]
 classifiers = [
     "Environment :: Console",
@@ -42,14 +41,43 @@ dft = "differential.main:main"
 dft-rename = "differential.rename_cli:main"
 differential-rename = "differential.rename_cli:main"
 
+[project.urls]
+Homepage = "https://github.com/leishi1313/Differential"
+Repository = "https://github.com/leishi1313/Differential"
+
 [build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
-[tool.pdm]
-distribution = true  # This ensures the package can be built and distributed
+[tool.hatch.version]
+source = "vcs"
 
-[tool.pdm.version]
-source = "scm"
-write_to = "differential/version.py"
-write_template = "version = '{}'"
+[tool.hatch.build.hooks.vcs]
+version-file = "src/differential/version.py"
+template = "version = '{version}'\n"
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+    "LICENSE",
+    "README.md",
+    "config.ini.example",
+    "pyproject.toml",
+    "requirements.txt",
+    "src",
+    "tests",
+    "uv.lock",
+]
+excludes = [
+    "src/differential/media_select_cli.py",
+    "tests/test_media_select_cli.py",
+    "**/__pycache__",
+    "**/*.pyc",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/differential"]
+exclude = [
+    "src/differential/media_select_cli.py",
+    "**/__pycache__",
+    "**/*.pyc",
+]

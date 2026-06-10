@@ -1,0 +1,9 @@
+.venv/
+.worktrees/
+__pycache__/
+*.pyc
+build/
+dist/
+*.egg-info/
+docs/
+usage.gif

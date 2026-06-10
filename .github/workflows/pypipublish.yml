@@ -15,11 +15,19 @@ jobs:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      - uses: pdm-project/setup-pdm@v4
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Build package distributions
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ github.event.release.tag_name }}
+        run: uv build
 
       - name: Publish package distributions to PyPI
-        env:
-          PDM_BUILD_SCM_VERSION: ${{ github.event.release.tag_name }}
-        run: pdm publish
+        run: uv publish --trusted-publishing always
