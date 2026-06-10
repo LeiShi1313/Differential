@@ -29,6 +29,27 @@ BOOLEAN_ARGS = (
     "non_interactive",
 )
 
+SCREENSHOT_TONEMAP_STATES = {
+    "auto": "auto",
+    "automatic": "auto",
+    "detect": "auto",
+    "detected": "auto",
+    "1": "always",
+    "yes": "always",
+    "true": "always",
+    "on": "always",
+    "always": "always",
+    "force": "always",
+    "forced": "always",
+    "0": "never",
+    "no": "never",
+    "false": "never",
+    "off": "never",
+    "never": "never",
+    "disable": "never",
+    "disabled": "never",
+}
+
 URL_SHORTENER_PATH = "https://2cn.io"
 
 

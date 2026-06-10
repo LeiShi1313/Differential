@@ -138,6 +138,23 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             help="是否压缩截图（无损），默认压缩",
             default=argparse.SUPPRESS,
         )
+        screenshot_tonemap_group = parser.add_mutually_exclusive_group()
+        screenshot_tonemap_group.add_argument(
+            "--screenshot-tonemap",
+            action="store_const",
+            const="always",
+            dest="screenshot_tonemap",
+            help="生成截图时强制使用ffmpeg tonemap滤镜，将HDR截图转换到BT.709",
+            default=argparse.SUPPRESS,
+        )
+        screenshot_tonemap_group.add_argument(
+            "--no-screenshot-tonemap",
+            action="store_const",
+            const="never",
+            dest="screenshot_tonemap",
+            help="关闭自动HDR截图tonemap",
+            default=argparse.SUPPRESS,
+        )
         parser.add_argument(
             "--image-hosting",
             type=ImageHosting,
@@ -341,6 +358,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         screenshot_count: int = 0,
         screenshot_path: str = None,
         optimize_screenshot: bool = True,
+        screenshot_tonemap: str = "auto",
         create_folder: bool = False,
         use_short_bdinfo: bool = False,
         scan_bdinfo: bool = True,
@@ -420,6 +438,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             screenshot_count=screenshot_count,
             screenshot_path=screenshot_path,
             optimize_screenshot=optimize_screenshot,
+            screenshot_tonemap=screenshot_tonemap,
             image_hosting=image_hosting,
             chevereto_hosting_url=chevereto_hosting_url,
             imgurl_hosting_url=imgurl_hosting_url,
@@ -494,6 +513,7 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             self.main_file,
             self.mediainfo_handler.resolution,
             self.mediainfo_handler.duration,
+            self.mediainfo_handler.tracks,
         )
 
         if self.generate_nfo:

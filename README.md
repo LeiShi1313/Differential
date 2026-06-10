@@ -99,6 +99,7 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 - `use_short_bdinfo`: 是否使用BDInfo的Quick Summary，默认使用完整的BDInfo
 - 原盘BDInfo扫描：Windows使用内置BDInfo；Linux/Mac优先使用`PATH`或`BDINFOPATH`中的原生`BDInfo`，找不到时回退到Mono运行内置BDInfo
 - `screenshot_count`: 截图生成的张数，默认为0，即不生成截图
+- `screenshot_tonemap`: 生成截图时是否使用ffmpeg tonemap滤镜将HDR/DoVi转换到BT.709，默认`auto`自动检测，可选`always`强制开启或`never`关闭
 - `image_hosting`: 图床的名称，现在支持ptpimg,chevereto,imgurl和SM.MS
 - `image_hosting_url`: 如果是自建的图床，提供图床链接
 - `announce_url`: 制种时的announce地址

@@ -3,7 +3,22 @@ from configparser import RawConfigParser
 
 from loguru import logger
 
-from differential.constants import ImageHosting, BOOLEAN_ARGS, BOOLEAN_STATES
+from differential.constants import (
+    ImageHosting,
+    BOOLEAN_ARGS,
+    BOOLEAN_STATES,
+    SCREENSHOT_TONEMAP_STATES,
+)
+
+
+def parse_screenshot_tonemap(value) -> str:
+    if isinstance(value, bool):
+        return "always" if value else "never"
+    mode = SCREENSHOT_TONEMAP_STATES.get(str(value or "").strip().lower())
+    if mode:
+        return mode
+    logger.warning(f"Unknown screenshot_tonemap value {value!r}; using auto")
+    return "auto"
 
 
 def merge_config(args: argparse.Namespace, section: str = '') -> dict:
@@ -43,6 +58,10 @@ def merge_config(args: argparse.Namespace, section: str = '') -> dict:
             if arg in merged and not isinstance(merged[arg], bool):
                 # Might be buggy to always assume not recognized args is False
                 merged[arg] = BOOLEAN_STATES.get(merged[arg], False)
+    if "screenshot_tonemap" in merged:
+        merged["screenshot_tonemap"] = parse_screenshot_tonemap(
+            merged["screenshot_tonemap"]
+        )
 
     # Parse int args
     for arg in merged:

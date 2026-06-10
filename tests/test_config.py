@@ -26,6 +26,7 @@ class ConfigTest(unittest.TestCase):
                     [NexusPHP]
                     easy_upload = true
                     auto_feed = false
+                    screenshot_tonemap = auto
                     screenshot_count = 0
                     """
                 ).strip(),
@@ -38,7 +39,29 @@ class ConfigTest(unittest.TestCase):
 
         self.assertIs(merged["easy_upload"], True)
         self.assertIs(merged["auto_feed"], False)
+        self.assertEqual(merged["screenshot_tonemap"], "auto")
         self.assertEqual(merged["screenshot_count"], 0)
+
+    def test_screenshot_tonemap_boolean_aliases(self):
+        for value, expected in (("true", "always"), ("false", "never")):
+            with self.subTest(value=value):
+                with tempfile.TemporaryDirectory() as tmp:
+                    config = Path(tmp) / "config.ini"
+                    config.write_text(
+                        textwrap.dedent(
+                            f"""
+                            [NexusPHP]
+                            screenshot_tonemap = {value}
+                            """
+                        ).strip(),
+                        encoding="utf-8",
+                    )
+
+                    merged = merge_config(
+                        Namespace(config=str(config), plugin="NexusPHP", section="")
+                    )
+
+                self.assertEqual(merged["screenshot_tonemap"], expected)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,8 @@ make_torrent = true
 
 ; 生成截图的数量
 screenshot_count = 6
+; 生成截图时自动检测HDR/DoVi并使用ffmpeg tonemap转换到BT.709，可选auto/always/never
+screenshot_tonemap = auto
 ; 图床，差速器支持PTPIMG、自建imgurl、自建Chevereto（z4a、imgbb、猫柠的图床等）、SM.MS和BYR作为图床
 image_hosting = CHEVERETO
 ; 自建Chevereto的地址

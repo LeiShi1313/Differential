@@ -322,6 +322,7 @@ class BasePluginIsoWorkflowTest(unittest.TestCase):
                     find_mediainfo=mock.Mock(return_value=mounted_stream),
                     resolution="1080p",
                     duration=1000,
+                    tracks=[],
                     media_info="media info",
                     cleanup=mock.Mock(),
                 ),
@@ -338,6 +339,7 @@ class BasePluginIsoWorkflowTest(unittest.TestCase):
             mounted_stream,
             "1080p",
             1000,
+            [],
         )
         generate_nfo.assert_called_once_with(iso, "media info")
         self.assertEqual(make_torrent.call_args.args[0], iso)
@@ -369,6 +371,7 @@ class BasePluginIsoWorkflowTest(unittest.TestCase):
                     find_mediainfo=mock.Mock(return_value=main_file),
                     resolution="1080p",
                     duration=1000,
+                    tracks=[],
                 ),
                 ptgen_handler=ptgen_handler,
                 screenshot_handler=SimpleNamespace(collect_screenshots=mock.Mock()),
