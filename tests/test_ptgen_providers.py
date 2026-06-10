@@ -202,6 +202,32 @@ class PTGenProviderTest(unittest.TestCase):
         self.assertIsInstance(imdb, IMDBData)
         self.assertEqual(provider.references[0].site, "imdb")
 
+    def test_handler_fetches_selected_reference_directly(self):
+        provider = MappingProvider(
+            {
+                ("imdb", "tt0111161"): {
+                    "site": "imdb",
+                    "sid": "tt0111161",
+                    "name": "The Shawshank Redemption",
+                    "description": "A banker keeps hope alive.",
+                }
+            }
+        )
+        reference = PTGenReference(
+            site="imdb",
+            sid="tt0111161",
+            original_url="https://www.imdb.com/title/tt0111161/",
+        )
+        handler = PTGenHandler("", providers=[provider])
+
+        ptgen, douban, imdb = handler.fetch_ptgen_reference(reference)
+
+        self.assertIsInstance(ptgen, IMDBData)
+        self.assertIsNone(douban)
+        self.assertIsInstance(imdb, IMDBData)
+        self.assertEqual(handler.url, reference.original_url)
+        self.assertEqual(provider.references[0], reference)
+
     def test_handler_supports_api_only_douban_personage_after_static_failures(self):
         provider = MappingProvider(
             {

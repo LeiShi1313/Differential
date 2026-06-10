@@ -75,6 +75,17 @@ class PTGenHandler:
             logger.warning(f"[PTGen] 不支持的链接: {self.url}")
             return (self._ptgen, self._douban, self._imdb)
 
+        return self.fetch_ptgen_reference(reference)
+
+    def fetch_ptgen_reference(self, reference: PTGenReference):
+        """
+        Fetch PtGen data from an already-selected reference.
+        """
+        self.url = reference.original_url
+        self._ptgen = None
+        self._douban = None
+        self._imdb = None
+
         self._ptgen = self._request_ptgen_info(reference)
         if self._ptgen.success:
             if self._ptgen.site != "imdb":

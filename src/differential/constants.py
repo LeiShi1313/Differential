@@ -25,6 +25,7 @@ BOOLEAN_ARGS = (
     "scan_bdinfo",
     "create_folder",
     "optimize_screenshot",
+    "non_interactive",
 )
 
 URL_SHORTENER_PATH = "https://2cn.io"

@@ -26,4 +26,10 @@ PARSER.add_argument(
 PARSER.add_argument(
     "--section", default="", help="指定config的section，差速器配置会依次从默认、插件默认和指定section读取并覆盖"
 )
+PARSER.add_argument(
+    "--non-interactive",
+    action="store_true",
+    help="禁用交互式输入；需要选择时只能自动选择高置信结果，否则退出",
+    default=argparse.SUPPRESS,
+)
 subparsers = PARSER.add_subparsers(help="使用下列插件名字来查看插件的详细用法")

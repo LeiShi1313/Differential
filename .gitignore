@@ -135,6 +135,8 @@ dmypy.json
 # For development
 .vscode
 test.py
+src/differential/media_select_cli.py
+tests/test_media_select_cli.py
 *.log
 config.ini
 differential/version.py

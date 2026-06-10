@@ -1,6 +1,7 @@
 import re
 import json
 import argparse
+import sys
 from pathlib import Path
 from typing import Optional
 from itertools import chain
@@ -20,6 +21,10 @@ from differential.utils.mediainfo_handler import MediaInfoHandler
 from differential.utils.ptgen_handler import PTGenHandler
 from differential.utils.screenshot_handler import ScreenshotHandler
 from differential.utils.nfo import generate_nfo
+from differential.utils.media_name import parse_media_name
+from differential.utils.media_search import DEFAULT_MEDIA_SEARCH_FIELDS, PTGEN_SEARCH_FIELDS
+from differential.utils.media_search import MediaSearchClient, result_to_ptgen_reference, select_media_result
+from differential.utils.media_tui import run_media_search_tui
 from differential.utils.ptgen.base import PTGenData, DataType
 from differential.utils.ptgen.imdb import IMDBData
 from differential.utils.ptgen.douban import DoubanData
@@ -48,6 +53,30 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         )
         parser.add_argument(
             "-u", "--url", type=str, help="豆瓣链接", default=argparse.SUPPRESS
+        )
+        parser.add_argument(
+            "--non-interactive",
+            action="store_true",
+            help="禁用交互式输入；需要选择时只能自动选择高置信结果，否则退出",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--ptgen-source",
+            choices=("douban", "imdb", "bangumi", "steam", "epic", "indienova"),
+            help="媒体搜索时只搜索指定的PtGen来源",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--ptgen-fields",
+            choices=PTGEN_SEARCH_FIELDS,
+            help="媒体搜索时只搜索指定的PtGen字段，默认只搜索标题和别名",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
+            "--search-hint",
+            type=str,
+            help="媒体搜索时追加到解析标题后的额外搜索关键词",
+            default=argparse.SUPPRESS,
         )
         parser.add_argument(
             "-uu",
@@ -349,11 +378,19 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         encoder_log: str = "",
         reuse_torrent: bool = True,
         from_torrent: str = None,
+        non_interactive: bool = False,
+        ptgen_source: str = None,
+        ptgen_fields: str = DEFAULT_MEDIA_SEARCH_FIELDS,
+        search_hint: str = "",
         **kwargs,
     ):
         self.folder = Path(folder)
         self.url = url
         self.upload_url = upload_url
+        self.non_interactive = non_interactive
+        self.ptgen_source = ptgen_source
+        self.ptgen_fields = ptgen_fields
+        self.search_hint = search_hint
 
         self.announce_url = announce_url
         self.generate_nfo = generate_nfo
@@ -446,7 +483,10 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
 
     def _prepare(self):
         self.main_file = self.mediainfo_handler.find_mediainfo()
-        self.ptgen, self.douban, self.imdb = self.ptgen_handler.fetch_ptgen_info()
+        if not hasattr(self, "url") or getattr(self, "url", ""):
+            self.ptgen, self.douban, self.imdb = self.ptgen_handler.fetch_ptgen_info()
+        else:
+            self.ptgen, self.douban, self.imdb = self._search_and_fetch_ptgen_info()
         self.screenshot_handler.collect_screenshots(
             self.main_file,
             self.mediainfo_handler.resolution,
@@ -464,6 +504,48 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 self.reuse_torrent,
                 self.from_torrent,
             )
+
+    def _search_and_fetch_ptgen_info(self):
+        parsed = parse_media_name(self.folder)
+        logger.info(
+            "[MediaSearch] 已解析媒体名: "
+            f"title={parsed.title or '-'}, "
+            f"primary_search_title={parsed.primary_search_title or '-'}, "
+            f"year={parsed.year or '-'}, kind={parsed.kind_hint or '-'}"
+        )
+
+        client = MediaSearchClient()
+        if (
+            not getattr(self, "non_interactive", False)
+            and sys.stdin.isatty()
+            and sys.stdout.isatty()
+        ):
+            selected = run_media_search_tui(
+                parsed,
+                client,
+                ptgen_source=getattr(self, "ptgen_source", None),
+                ptgen_fields=getattr(self, "ptgen_fields", DEFAULT_MEDIA_SEARCH_FIELDS),
+                search_hint=getattr(self, "search_hint", ""),
+            )
+            if selected is None:
+                raise RuntimeError("media selection aborted")
+        else:
+            results = client.search_parsed(
+                parsed,
+                ptgen_source=getattr(self, "ptgen_source", None),
+                ptgen_fields=getattr(self, "ptgen_fields", DEFAULT_MEDIA_SEARCH_FIELDS),
+                search_hint=getattr(self, "search_hint", ""),
+            )
+            selected = select_media_result(
+                results,
+                parsed,
+                non_interactive=getattr(self, "non_interactive", False),
+            )
+
+        reference = result_to_ptgen_reference(selected)
+        self.url = reference.original_url
+        logger.info(f"[MediaSearch] 已选择: {selected.display_title} -> {reference.site}/{reference.sid}")
+        return self.ptgen_handler.fetch_ptgen_reference(reference)
 
     @property
     def parsed_encoder_log(self):

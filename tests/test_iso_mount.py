@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from differential.base_plugin import Base
 from differential.utils.mediainfo_handler import MediaInfoHandler
+from differential.utils.ptgen.reference import PTGenReference
 from differential.utils.privilege import run_command, run_with_sudo_fallback
 from differential.version import version
 
@@ -340,6 +341,58 @@ class BasePluginIsoWorkflowTest(unittest.TestCase):
         )
         generate_nfo.assert_called_once_with(iso, "media info")
         self.assertEqual(make_torrent.call_args.args[0], iso)
+
+    def test_prepare_searches_media_when_url_is_omitted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "[两心不疑].No.Doubt.in.Us.2026.S01.Complete"
+            folder.mkdir()
+            main_file = folder / "episode.mkv"
+            main_file.write_bytes(b"video")
+            selected = SimpleNamespace(display_title="两心不疑")
+            reference = PTGenReference(
+                site="douban",
+                sid="37227662",
+                original_url="https://movie.douban.com/subject/37227662/",
+            )
+            client = SimpleNamespace(search_parsed=mock.Mock(return_value=[selected]))
+            ptgen_handler = SimpleNamespace(fetch_ptgen_reference=mock.Mock(return_value=("ptgen", "douban", "imdb")))
+            plugin = SimpleNamespace(
+                folder=folder,
+                url="",
+                non_interactive=True,
+                ptgen_source="douban",
+                ptgen_fields="title_aliases",
+                search_hint="国漫",
+                generate_nfo=False,
+                make_torrent=False,
+                mediainfo_handler=SimpleNamespace(
+                    find_mediainfo=mock.Mock(return_value=main_file),
+                    resolution="1080p",
+                    duration=1000,
+                ),
+                ptgen_handler=ptgen_handler,
+                screenshot_handler=SimpleNamespace(collect_screenshots=mock.Mock()),
+            )
+            plugin._search_and_fetch_ptgen_info = Base._search_and_fetch_ptgen_info.__get__(plugin, type(plugin))
+
+            with mock.patch("differential.base_plugin.MediaSearchClient", return_value=client), mock.patch(
+                "differential.base_plugin.select_media_result",
+                return_value=selected,
+            ) as select_result, mock.patch(
+                "differential.base_plugin.result_to_ptgen_reference",
+                return_value=reference,
+            ):
+                Base._prepare(plugin)
+
+        client.search_parsed.assert_called_once()
+        self.assertEqual(client.search_parsed.call_args.kwargs["ptgen_source"], "douban")
+        self.assertEqual(client.search_parsed.call_args.kwargs["ptgen_fields"], "title_aliases")
+        self.assertEqual(client.search_parsed.call_args.kwargs["search_hint"], "国漫")
+        select_result.assert_called_once()
+        self.assertTrue(select_result.call_args.kwargs["non_interactive"])
+        ptgen_handler.fetch_ptgen_reference.assert_called_once_with(reference)
+        self.assertEqual(plugin.url, reference.original_url)
+        self.assertEqual((plugin.ptgen, plugin.douban, plugin.imdb), ("ptgen", "douban", "imdb"))
 
 
 if __name__ == "__main__":

@@ -22,14 +22,13 @@ setup(
         "Operating System :: POSIX :: Linux",
         "Operating System :: Microsoft :: Windows",
         "Operating System :: OS Independent",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "License :: OSI Approved :: MIT License",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     install_requires=[
         "loguru",
         "requests",
@@ -38,6 +37,7 @@ setup(
         "torf>=3.1.3",
         "bencode.py==4.0.0",
         "lxml>=4.7.1",
+        "textual>=8.2.7",
     ],
     entry_points={
         "console_scripts": [
