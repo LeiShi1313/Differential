@@ -16,6 +16,7 @@ BOOLEAN_ARGS = (
     "generate_nfo",
     "make_torrent",
     "easy_upload",
+    "auto_feed",
     "trim_description",
     "combine_screenshots",
     "imgbox_family_safe",

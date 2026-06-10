@@ -6,10 +6,85 @@ from differential.utils.mediainfo import get_full_mediainfo
 
 
 class AutoFeed(TorrnetBase):
+    VIDEO_TYPE_MAP = {
+        "web": "WEB-DL",
+        "webdl": "WEB-DL",
+        "webrip": "WEB-DL",
+        "remux": "Remux",
+        "hdtv": "HDTV",
+        "encode": "Encode",
+        "bluray": "Blu-ray",
+        "bd": "Blu-ray",
+        "uhd": "UHD",
+        "uhdbluray": "UHD",
+        "dvd": "DVD",
+        "dvdr": "DVD",
+        "cd": "CD",
+    }
+
+    VIDEO_CODEC_MAP = {
+        "avc": "H264",
+        "h264": "H264",
+        "x264": "X264",
+        "hevc": "H265",
+        "h265": "H265",
+        "x265": "X265",
+        "vvc": "H266",
+        "h266": "H266",
+        "av1": "AV1",
+        "vc1": "VC-1",
+        "mpeg2": "MPEG-2",
+        "mpeg4": "MPEG-4",
+        "xvid": "XVID",
+        "divx": "DIVX",
+        "vp9": "VP9",
+    }
+
+    AUDIO_CODEC_MAP = {
+        "aac": "AAC",
+        "dd": "AC3",
+        "dd+": "AC3",
+        "ddp": "AC3",
+        "eac3": "AC3",
+        "ac3": "AC3",
+        "dolbydigital": "AC3",
+        "dolbydigitalplus": "AC3",
+        "dtshd": "DTS-HD",
+        "dtshdma": "DTS-HDMA",
+        "dtshdmasteraudio": "DTS-HDMA",
+        "dtshdhr": "DTS-HDHR",
+        "dtsx": "DTS-X",
+        "dts": "DTS",
+        "atmos": "Atmos",
+        "dolbydigitalpluswithdolbyatmos": "Atmos",
+        "truehd": "TrueHD",
+        "dolbytruehd": "TrueHD",
+        "dolbytruehdwithdolbyatmos": "TrueHD",
+        "lpcm": "LPCM",
+        "pcm": "LPCM",
+        "flac": "Flac",
+        "ape": "APE",
+        "mp3": "MP3",
+        "wav": "WAV",
+        "ogg": "OGG",
+        "opus": "OPUS",
+    }
 
     def __init__(self, plugin: TorrnetBase, separator: str = "separator#"):
         self.plugin = plugin
         self.separator = separator
+
+    @staticmethod
+    def _compact(value: str) -> str:
+        return (
+            str(value or "")
+            .strip()
+            .lower()
+            .replace("_", "")
+            .replace("-", "")
+            .replace(".", "")
+            .replace(" ", "")
+        )
 
     def __getattribute__(self, name):
         try:
@@ -42,12 +117,19 @@ class AutoFeed(TorrnetBase):
         return ''
 
     @property
+    def video_type(self):
+        value = self.plugin.video_type
+        return self.VIDEO_TYPE_MAP.get(self._compact(value), value)
+
+    @property
     def video_codec(self):
-        return self.plugin.video_codec.upper()
+        value = self.plugin.video_codec
+        return self.VIDEO_CODEC_MAP.get(self._compact(value), str(value or "").upper())
 
     @property
     def audio_codec(self):
-        return self.plugin.audio_codec.upper()
+        value = self.plugin.audio_codec
+        return self.AUDIO_CODEC_MAP.get(self._compact(value), str(value or "").upper())
 
     @property
     def resolution(self):
