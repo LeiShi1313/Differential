@@ -15,6 +15,7 @@ from pymediainfo import MediaInfo
 from differential import tools
 from differential.version import version
 from differential.utils.binary import execute_with_output
+from differential.utils.media_identity import bdinfo_cache_key, media_identity
 from differential.utils.mediainfo import get_full_mediainfo, get_duration, get_resolution
 from differential.utils.privilege import run_command, run_with_sudo_fallback
 
@@ -93,6 +94,7 @@ class MediaInfoHandler:
         self.scan_bdinfo = scan_bdinfo
         self.media_name = self._media_name(folder)
         self.cache_key = self._sanitize_name(self.media_name)
+        self.stable_cache_key: Optional[str] = None
 
         self.is_bdmv = False
         self.bdinfo = None
@@ -116,6 +118,7 @@ class MediaInfoHandler:
             self._mount_iso()
 
         self._handle_single_or_folder()
+        self._set_stable_cache_key()
         if not self.main_file:
             logger.error("未找到可分析的文件，请确认路径。")
             sys.exit(1)
@@ -299,7 +302,10 @@ class MediaInfoHandler:
             return cached
 
         # Otherwise, run BDInfo scanning
-        temp_dir = tempfile.mkdtemp(prefix=f"Differential.bdinfo.{version}.", suffix=f".{self.cache_key}")
+        if self.stable_cache_key:
+            temp_dir = tempfile.mkdtemp(prefix=f"{self.stable_cache_key}.")
+        else:
+            temp_dir = tempfile.mkdtemp(prefix=f"Differential.bdinfo.{version}.", suffix=f".{self.cache_key}")
         self._run_bdinfo_scan(temp_dir)
         return self._collect_bdinfo_from_temp(temp_dir)
 
@@ -307,12 +313,31 @@ class MediaInfoHandler:
         """
         Look in the temp dir for an existing BDInfo scan matching this media.
         """
+        if self.stable_cache_key:
+            pattern = f"{glob.escape(self.stable_cache_key)}.*"
+            for d in (Path(p) for p in glob.glob(str(Path(tempfile.gettempdir()).joinpath(pattern)))):
+                if d.is_dir():
+                    if txt_files := list(d.glob("*.txt")):
+                        return self._extract_bdinfo_content(txt_files)
+
         pattern = f"Differential.bdinfo.{glob.escape(version)}.*.{glob.escape(self.cache_key)}"
         for d in (Path(p) for p in glob.glob(str(Path(tempfile.gettempdir()).joinpath(pattern)))):
             if d.is_dir():
                 if txt_files := list(d.glob("*.txt")):
                     return self._extract_bdinfo_content(txt_files)
         return None
+
+    def _set_stable_cache_key(self) -> None:
+        try:
+            identity_root = self.folder
+            if self.original_folder.is_file() and self.original_folder.suffix.lower() == ".iso":
+                identity = media_identity(self.original_folder)
+            else:
+                identity = media_identity(identity_root, self.main_file, self.is_bdmv)
+            self.stable_cache_key = bdinfo_cache_key(identity)
+        except Exception as e:
+            self.stable_cache_key = None
+            logger.debug(f"[MediaInfo] 稳定媒体缓存Key生成失败: {e}")
 
     def _run_bdinfo_scan(self, temp_dir: str) -> None:
         runner = self._select_bdinfo_runner()

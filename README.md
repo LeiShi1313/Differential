@@ -108,6 +108,42 @@ dft [插件名字] -f [种子文件夹] -u [豆瓣URL]
 - `trim_description`: 默认关闭，开启的话会省略掉上传链接的描述部分，以避免链接过长浏览器无法打开的问题
 - `use_short_url`: 默认关闭，开启的话使用短链接服务把上传链接缩短
 
+## dft-rename 媒体重命名
+
+`dft-rename` 可以根据媒体扫描结果和 PtGen 信息生成 PT 常见命名，并重命名媒体文件夹和其中的主要媒体文件。原盘/BDMV 默认只重命名顶层文件夹，不改动 `BDMV` 内部文件。
+
+```shell
+dft-rename /path/to/media -u [豆瓣或IMDb URL]
+dft-rename /path/to/media --title "Movie Title" --year 2024 --source NF --type WEB-DL --uploader GROUP
+dft-rename /path/to/media --title "Movie Title" --year 2024 --yes
+```
+
+默认是交互式预览确认。`--dry-run` 只打印计划，`--json` 输出机器可读计划，`--yes` 直接执行且不会从旧文件名推断 `source` 或 `uploader`。如果当前工作目录存在 `config.ini`，`dft-rename` 会读取其中的 `[Rename]` 和 `[RenameCodecMap]`；也可以用 `--config /path/to/config.ini` 指定配置文件。命令行参数优先级高于配置文件。
+
+`[Rename]` 可设置常用默认 token，例如：
+
+```ini
+[Rename]
+source = NF
+type = WEB-DL
+uploader = GROUP
+include_info_sidecars = false
+folder_only = false
+scan_bdinfo = true
+```
+
+`source` 和 `type` 会分开输出，比如 `NF.WEB-DL`。不要把它们合成一个 `source = NF.WEB-DL`。
+
+`[RenameCodecMap]` 用来定义偏好的最终视频/音频 codec 写法。映射发生在内置规范化之后：
+
+```ini
+[RenameCodecMap]
+video.H.264 = H264
+video.HEVC = H265
+audio.AAC2.0 = AAC
+audio.DTS-HD.MA5.1 = DTS-HD.MA.5.1
+```
+
 ## 其他插件
 
 为保护站点信息，请到[`plugins`](https://github.com/LeiShi1313/Differential/tree/main/differential/plugins)文件夹查看或者`dft [插件名称] -h`查看支持的参数

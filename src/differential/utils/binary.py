@@ -84,7 +84,12 @@ def execute(binary_name: str, args: str, abort: bool = False) -> str:
     proc = subprocess.run(
             cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     logger.trace(proc)
-    ret = "\n".join([proc.stdout.decode(), proc.stderr.decode()])
+    ret = "\n".join(
+        [
+            proc.stdout.decode(errors="replace"),
+            proc.stderr.decode(errors="replace"),
+        ]
+    )
     if proc.returncode != 0:
         logger.warning(f"{binary_name} exit with return code {proc.returncode}:\n{ret}")
     return ret

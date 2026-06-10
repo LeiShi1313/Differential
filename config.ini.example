@@ -45,3 +45,76 @@ team = LeagueTV
 source_name = HDTV
 
 [CHDBits]
+
+
+[Rename]
+; dft-rename 专用配置。默认读取当前工作目录下的 config.ini，命令行参数优先级更高。
+; source 和 type 会作为独立 token 输出，例如 NF.WEB-DL，不要写成 source = NF.WEB-DL。
+; source = NF
+; uploader = GROUP
+; type = WEB-DL
+; video_codec = H264
+; audio_codec = AAC2.0
+; resolution = 1080p
+; edition = PROPER
+; hdr = DV.HDR
+; include_info_sidecars = false
+; folder_only = false
+; scan_bdinfo = true
+
+[RenameCodecMap]
+; dft-rename 会先做内置规范化，再用这里的映射改成你偏好的最终 token。
+; 左侧格式为 video.<规范化或常见写法> / audio.<规范化或常见写法>，右侧为最终输出。
+; 下面列出的是 dft-rename 当前内置默认映射。如果你喜欢另一种写法，复制一行并改右侧即可。
+;
+; Video codec aliases
+; video.AVC = AVC
+; video.H.264 = H264
+; video.H264 = H264
+; video.x264 = x264
+; video.HEVC = HEVC
+; video.H.265 = H265
+; video.H265 = H265
+; video.x265 = x265
+; video.MPEG-2 = MPEG-2
+; video.MPEG2 = MPEG-2
+; video.VC-1 = VC-1
+; video.VC1 = VC-1
+; video.AV1 = AV1
+;
+; Audio codec aliases
+; audio.AAC = AAC
+; audio.AAC2.0 = AAC
+; audio.AAC5.1 = AAC5.1
+; audio.AC3 = AC3
+; audio.AC35.1 = AC35.1
+; audio.DD = DD
+; audio.DD2.0 = DD2.0
+; audio.DD5.1 = DD5.1
+; audio.DD+ = DDP
+; audio.DDP = DDP
+; audio.DDP2.0 = DDP2.0
+; audio.DDP5.1 = DDP5.1
+; audio.DDP7.1 = DDP7.1
+; audio.DolbyDigitalPlusWithDolbyAtmos = DDP
+; audio.DolbyDigitalPlus = DDP
+; audio.DolbyDigital = DD
+; audio.TrueHD = TrueHD
+; audio.TrueHD5.1 = TrueHD5.1
+; audio.TrueHD7.1 = TrueHD7.1
+; audio.DolbyTrueHDWithDolbyAtmos = TrueHD
+; audio.DolbyTrueHD = TrueHD
+; audio.Atmos = Atmos
+; audio.DTS = DTS
+; audio.DTS5.1 = DTS5.1
+; audio.DTS-HD.MA = DTS-HD.MA
+; audio.DTS-HD.MA5.1 = DTS-HD.MA5.1
+; audio.DTS-HD.MA7.1 = DTS-HD.MA7.1
+; audio.DTSHDMA = DTS-HD.MA
+; audio.DTSHDMasterAudio = DTS-HD.MA
+; audio.FLAC = FLAC
+; audio.FLAC2.0 = FLAC2.0
+; audio.FLAC5.1 = FLAC5.1
+; audio.LPCM = LPCM
+; audio.LPCM2.0 = LPCM2.0
+; audio.LPCM5.1 = LPCM5.1

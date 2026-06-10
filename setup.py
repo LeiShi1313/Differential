@@ -43,6 +43,8 @@ setup(
         "console_scripts": [
             "differential=differential.main:main",
             "dft=differential.main:main",
+            "dft-rename=differential.rename_cli:main",
+            "differential-rename=differential.rename_cli:main",
         ]
     },
 )
