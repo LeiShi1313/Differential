@@ -336,8 +336,8 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
     def __init__(
         self,
         folder: str,
-        url: str,
-        upload_url: str,
+        url: str = "",
+        upload_url: str = "",
         screenshot_count: int = 0,
         screenshot_path: str = None,
         optimize_screenshot: bool = True,
@@ -384,6 +384,9 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         search_hint: str = "",
         **kwargs,
     ):
+        if not upload_url:
+            raise TypeError("__init__() missing 1 required positional argument: 'upload_url'")
+
         self.folder = Path(folder)
         self.url = url
         self.upload_url = upload_url

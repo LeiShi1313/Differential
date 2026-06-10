@@ -10,6 +10,17 @@ from differential.utils.config import merge_config
 from differential.plugin_register import REGISTERED_PLUGINS
 from differential.plugin_loader import load_plugins_from_dir, load_plugin_from_file
 
+
+SENSITIVE_CONFIG_KEYS = ("api_key", "cookie", "password", "secret", "token")
+
+
+def _redact_config(config: dict) -> dict:
+    return {
+        key: "<redacted>" if any(secret in key.lower() for secret in SENSITIVE_CONFIG_KEYS) and value else value
+        for key, value in config.items()
+    }
+
+
 @logger.catch
 def main():
     known_args, remaining_argv = PRE_PARSER.parse_known_args()
@@ -27,11 +38,11 @@ def main():
         log = config.pop('log')
         logger.add(log, level="TRACE", backtrace=True, diagnose=True)
 
-    logger.debug("Config: {}".format(config))
+    logger.debug("Config: {}".format(_redact_config(config)))
     if hasattr(args, 'plugin'):
         plugin = config.pop('plugin')
         try:
-            logger.trace(config)
+            logger.trace(_redact_config(config))
             REGISTERED_PLUGINS[plugin](**config).upload()
         except TypeError as e:
             m = re.search(r'missing \d+ required positional argument[s]{0,1}: (.*?)$', str(e))
