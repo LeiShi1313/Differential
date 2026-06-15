@@ -204,6 +204,12 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
             default=argparse.SUPPRESS,
         )
         parser.add_argument(
+            "--imgurl-hosting-url",
+            type=str,
+            help="Imgurl图床的地址",
+            default=argparse.SUPPRESS,
+        )
+        parser.add_argument(
             "--imgurl-api-key",
             type=str,
             help="Imgurl的API Key",

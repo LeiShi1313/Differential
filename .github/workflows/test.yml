@@ -30,3 +30,10 @@ jobs:
 
       - name: Build package
         run: uv build
+
+      - name: Smoke test built wheel
+        run: |
+          python -m venv /tmp/differential-wheel-smoke
+          /tmp/differential-wheel-smoke/bin/python -m pip install dist/*.whl
+          /tmp/differential-wheel-smoke/bin/differential --version
+          /tmp/differential-wheel-smoke/bin/dft-rename --help

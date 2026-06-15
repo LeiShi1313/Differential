@@ -22,7 +22,7 @@ def _redact_config(config: dict) -> dict:
     }
 
 
-@logger.catch
+@logger.catch(reraise=True)
 def main():
     known_args, remaining_argv = PRE_PARSER.parse_known_args()
     load_plugins_from_dir(Path(__file__).resolve().parent.joinpath("plugins"))
@@ -52,7 +52,7 @@ def main():
             m = re.search(r'missing \d+ required positional argument[s]{0,1}: (.*?)$', str(e))
             if m:
                 logger.error("缺少插件必需的参数，请检查输入的参数: {}".format(m.groups()[0]))
-                return
+                return 1
             raise e
     else:
         PARSER.print_help()

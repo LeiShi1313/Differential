@@ -12,11 +12,17 @@ from differential.commands import PARSER
 from differential.doctor import (
     Diagnostic,
     _check_bdinfo,
+    _check_binary,
     _check_config,
     _check_image_host_config,
     run_doctor,
 )
+# Imported so PluginRegister registers CHDBitsEncode for _check_config.
+from differential.plugins.chdbits_encode import CHDBitsEncode
 from differential.plugins.nexusphp import NexusPHP
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class DoctorTest(unittest.TestCase):
@@ -116,6 +122,33 @@ class DoctorTest(unittest.TestCase):
 
         self.assertEqual(diagnostic.status, "ok")
         self.assertEqual(diagnostic.message, str(bdinfo))
+
+    def test_ffmpeg_check_honors_runtime_env_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ffmpeg = Path(tmp) / "ffmpeg-custom"
+            ffmpeg.write_text("#!/bin/sh\n", encoding="utf-8")
+
+            with mock.patch.dict(os.environ, {"FFMPEGPATH": str(ffmpeg)}), mock.patch(
+                "differential.doctor.shutil.which",
+                return_value=None,
+            ):
+                diagnostic = _check_binary("ffmpeg", "ffmpeg")
+
+        self.assertEqual(diagnostic.status, "ok")
+        self.assertEqual(diagnostic.message, f"FFMPEGPATH={ffmpeg}")
+
+    def test_example_league_official_section_validates_for_chdbits_encode(self):
+        args = argparse.Namespace(
+            config=str(ROOT / "config.ini.example"),
+            doctor_plugin="CHDBitsEncode",
+            doctor_section="LeagueOfficial",
+        )
+
+        diagnostic, merged = _check_config(args)
+
+        self.assertEqual(diagnostic.status, "ok")
+        self.assertEqual(merged["team"], "LeagueTV")
+        self.assertEqual(merged["source_name"], "HDTV")
 
     def test_run_doctor_prints_diagnostics_and_returns_failure(self):
         diagnostics = [

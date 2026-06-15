@@ -161,6 +161,25 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(merged["encoder"], "Alice")
         self.assertTrue(merged["make_torrent"])
 
+    def test_imgurl_hosting_url_config_key_is_allowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "config.ini"
+            config.write_text(
+                "[DEFAULT]\n"
+                "folder = /media/Movie\n"
+                "upload_url = https://example.test/upload.php\n"
+                "image_hosting = imgurl\n"
+                "imgurl_hosting_url = https://img.example.test\n"
+                "imgurl_api_key = secret\n",
+                encoding="utf-8",
+            )
+            args = argparse.Namespace(config=str(config), plugin="NexusPHP")
+
+            merged = merge_config(args)
+
+        self.assertEqual(merged["imgurl_hosting_url"], "https://img.example.test")
+        self.assertEqual(merged["imgurl_api_key"], "secret")
+
 
 if __name__ == "__main__":
     unittest.main()

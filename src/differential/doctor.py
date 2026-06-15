@@ -1,4 +1,5 @@
 import argparse
+import os
 import platform
 import shutil
 import webbrowser
@@ -41,10 +42,43 @@ def collect_diagnostics(args: argparse.Namespace) -> list[Diagnostic]:
 
 
 def _check_binary(name: str, command: str) -> Diagnostic:
-    path = shutil.which(command)
+    path = _runtime_binary_path(command)
     if path:
         return Diagnostic(name, "ok", path)
     return Diagnostic(name, "fail", f"{command} not found in PATH")
+
+
+def _runtime_binary_path(command: str) -> Optional[str]:
+    direct = Path(command)
+    if direct.is_file():
+        return str(direct)
+
+    env_name = f"{command.upper()}PATH"
+    env_value = os.environ.get(env_name)
+    if env_value:
+        env_path = Path(env_value)
+        if env_path.is_file():
+            return f"{env_name}={env_path}"
+        return None
+
+    cwd_candidate = Path.cwd().joinpath(command)
+    if cwd_candidate.is_file():
+        return str(cwd_candidate)
+
+    path = shutil.which(command)
+    if path:
+        return path
+
+    if platform.system() == "Windows":
+        windows_name = f"{command}.exe"
+        cwd_candidate = Path.cwd().joinpath(windows_name)
+        if cwd_candidate.is_file():
+            return str(cwd_candidate)
+        path = shutil.which(windows_name)
+        if path:
+            return path
+
+    return None
 
 
 def _check_bdinfo() -> Diagnostic:

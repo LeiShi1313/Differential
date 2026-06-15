@@ -1,5 +1,9 @@
+import subprocess
+import sys
 import tempfile
+import textwrap
 import unittest
+from pathlib import Path
 
 from differential.main import _redact_config
 from differential.plugins.nexusphp import NexusPHP
@@ -39,6 +43,64 @@ class MainCliTest(unittest.TestCase):
         self.assertEqual(redacted["cloudinary_api_secret"], "<redacted>")
         self.assertEqual(redacted["lsky_token"], "")
         self.assertEqual(config["ptpimg_api_key"], "secret-api-key")
+
+    def test_invalid_upload_config_exits_nonzero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "config.ini"
+            config.write_text(
+                textwrap.dedent(
+                    f"""
+                    [DEFAULT]
+                    folder = {tmp}
+                    upload_url = https://example.test/upload.php
+                    not_a_real_key = true
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "differential.main",
+                    "NexusPHP",
+                    "-c",
+                    str(config),
+                ],
+                text=True,
+                capture_output=True,
+            )
+
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("unsupported config key: not_a_real_key", proc.stderr)
+
+    def test_missing_required_plugin_arg_exits_nonzero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "config.ini"
+            config.write_text(
+                textwrap.dedent(
+                    f"""
+                    [DEFAULT]
+                    folder = {tmp}
+                    """
+                ).strip(),
+                encoding="utf-8",
+            )
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "differential.main",
+                    "NexusPHP",
+                    "-c",
+                    str(config),
+                ],
+                text=True,
+                capture_output=True,
+            )
+
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("upload_url", proc.stderr)
 
 
 if __name__ == "__main__":
