@@ -9,6 +9,7 @@ from differential.commands import PRE_PARSER, PARSER
 from differential.utils.config import merge_config
 from differential.plugin_register import REGISTERED_PLUGINS
 from differential.plugin_loader import load_plugins_from_dir, load_plugin_from_file
+from differential.doctor import run_doctor
 
 
 SENSITIVE_CONFIG_KEYS = ("api_key", "cookie", "password", "secret", "token")
@@ -32,6 +33,9 @@ def main():
 
     args = PARSER.parse_args(remaining_argv)
     logger.info("Differential 差速器 {}".format(version))
+    if getattr(args, "command", "") == "doctor":
+        return run_doctor(args)
+
     config = merge_config(args, args.section)
 
     if 'log' in config:

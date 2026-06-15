@@ -33,3 +33,24 @@ PARSER.add_argument(
     default=argparse.SUPPRESS,
 )
 subparsers = PARSER.add_subparsers(help="使用下列插件名字来查看插件的详细用法")
+
+doctor_parser = subparsers.add_parser("doctor", help="检查外部依赖、配置和基础运行环境")
+doctor_parser.set_defaults(command="doctor")
+doctor_parser.add_argument(
+    "-c",
+    "--config",
+    type=str,
+    help="配置文件的路径，默认为config.ini",
+    default="config.ini",
+)
+doctor_parser.add_argument(
+    "--section",
+    dest="doctor_section",
+    default="",
+    help="指定config的section，用于验证该section覆盖后的配置",
+)
+doctor_parser.add_argument(
+    "doctor_plugin",
+    nargs="?",
+    help="要验证配置的插件名或别名；省略时只检查配置文件语法",
+)
