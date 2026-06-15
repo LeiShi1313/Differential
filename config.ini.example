@@ -64,6 +64,17 @@ source_name = HDTV
 ; folder_only = false
 ; scan_bdinfo = true
 
+[RenameWords]
+; dft-rename 会在解析旧文件名前先应用这些规则。block 会先执行，匹配后直接拒绝规划；
+; replace 使用「pattern => replacement」格式，普通 pattern 默认大小写不敏感。
+; 需要正则时显式加 regex: 前缀，避免普通文本被误当正则。
+; block =
+;     sample
+;     regex:\btrailer\b
+; replace =
+;     WEB DL => WEB-DL
+;     regex:\s+=> .
+
 [RenameCodecMap]
 ; dft-rename 会先做内置规范化，再用这里的映射改成你偏好的最终 token。
 ; 左侧格式为 video.<规范化或常见写法> / audio.<规范化或常见写法>，右侧为最终输出。

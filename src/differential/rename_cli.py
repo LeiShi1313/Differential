@@ -11,8 +11,10 @@ from differential.utils.rename.metadata import fetch_url_metadata, manual_metada
 from differential.utils.rename.models import TechnicalTokens
 from differential.utils.rename.plan import RenamePlanError, build_rename_plan
 from differential.utils.rename.prompt import choose_optional, confirm_apply, print_plan
+from differential.utils.rename.release_tokens import parse_release_tokens
 from differential.utils.rename.scan import scan_media
 from differential.utils.rename.tokens import suggest_tokens
+from differential.utils.rename.words import apply_rename_words
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -122,9 +124,13 @@ def build_plan_from_args(args: argparse.Namespace):
     if not path.exists():
         raise RenamePlanError(f"input path does not exist: {path}")
 
+    word_application = apply_rename_words(path, args.rename_words)
+    if word_application.blocked:
+        raise RenamePlanError(f"blocked by [RenameWords] rule: {word_application.blocked_by}")
+
     scan = scan_media(path, scan_bdinfo=args.scan_bdinfo)
-    metadata = _metadata_from_args(args)
-    suggestions = suggest_tokens(path)
+    metadata = _metadata_from_args(args, word_application.name)
+    suggestions = suggest_tokens(word_application.name)
     tokens = _tokens_from_args(args, scan, suggestions, prompts_allowed=should_prompt(args))
     plan = build_rename_plan(
         scan,
@@ -134,6 +140,7 @@ def build_plan_from_args(args: argparse.Namespace):
         folder_only=args.folder_only,
         codec_map=args.rename_codec_map,
     )
+    plan.parse = _parse_diagnostics(args, scan, suggestions, tokens, word_application)
     return plan, scan
 
 
@@ -146,13 +153,13 @@ def should_prompt(args: argparse.Namespace) -> bool:
     )
 
 
-def _metadata_from_args(args: argparse.Namespace):
+def _metadata_from_args(args: argparse.Namespace, parse_input: str = ""):
     if args.title and args.year:
-        season, episode = _season_episode_from_args_or_path(args)
+        season, episode = _season_episode_from_args_or_path(args, parse_input)
         return manual_metadata(args.title, args.year, season, episode)
 
     metadata, _ptgen, _douban, _imdb = fetch_url_metadata(args.url)
-    season, episode = _season_episode_from_args_or_path(args)
+    season, episode = _season_episode_from_args_or_path(args, parse_input)
     if season:
         metadata.season = normalize_season(season)
         metadata.kind = "tv"
@@ -166,10 +173,10 @@ def _metadata_from_args(args: argparse.Namespace):
     return metadata
 
 
-def _season_episode_from_args_or_path(args: argparse.Namespace) -> tuple[str, str]:
+def _season_episode_from_args_or_path(args: argparse.Namespace, parse_input: str = "") -> tuple[str, str]:
     if args.season or args.episode:
         return args.season or "", args.episode or ""
-    parsed = parse_media_name(args.path)
+    parsed = parse_media_name(parse_input or args.path)
     return parsed.season_text or "", parsed.episode_text or ""
 
 
@@ -226,6 +233,80 @@ def _json_payload(plan, applied) -> str:
     payload = plan.to_dict()
     payload["applied"] = [operation.to_dict() for operation in applied]
     return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def _parse_diagnostics(args: argparse.Namespace, scan, suggestions, tokens: TechnicalTokens, word_application) -> dict:
+    parsed = parse_media_name(word_application.name)
+    release_tokens = parse_release_tokens(word_application.name)
+    return {
+        "original_name": word_application.original_name,
+        "clean_name": parsed.clean_name,
+        "title_candidates": list(parsed.title_candidates),
+        "identity": {
+            "title": parsed.title,
+            "year": parsed.year,
+            "kind_hint": parsed.kind_hint,
+            "season": parsed.season,
+            "episode": parsed.episode,
+        },
+        "release_tokens": release_tokens.to_dict(),
+        "selected_tokens": _selected_token_sources(args, scan, suggestions, tokens),
+        "applied_words": list(word_application.applied),
+        "warnings": _unique_list(list(word_application.warnings) + list(parsed.warnings) + list(release_tokens.warnings)),
+    }
+
+
+def _selected_token_sources(args: argparse.Namespace, scan, suggestions, tokens: TechnicalTokens) -> dict:
+    fields = (
+        "resolution",
+        "source",
+        "release_type",
+        "video_codec",
+        "hdr",
+        "audio_codec",
+        "edition",
+        "uploader",
+    )
+    return {
+        field: {
+            "value": getattr(tokens, field, ""),
+            "source": _token_source(field, args, scan, suggestions, tokens),
+        }
+        for field in fields
+    }
+
+
+def _token_source(field: str, args: argparse.Namespace, scan, suggestions, tokens: TechnicalTokens) -> str:
+    value = getattr(tokens, field, "")
+    if not value:
+        return "none"
+    if getattr(args, field, ""):
+        return "supplied"
+    if field in {"resolution", "release_type", "video_codec", "hdr", "audio_codec"} and getattr(scan, field, ""):
+        return "scan"
+
+    suggestion_fields = {
+        "source": "sources",
+        "release_type": "release_types",
+        "hdr": "hdr",
+        "edition": "editions",
+        "uploader": "uploaders",
+    }
+    suggestion_name = suggestion_fields.get(field)
+    if suggestion_name and value in getattr(suggestions, suggestion_name, []):
+        return "prompt" if field in {"source", "uploader"} else "inferred"
+    return "inferred"
+
+
+def _unique_list(values) -> list:
+    result = []
+    seen = set()
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
 
 
 def _first(values) -> str:

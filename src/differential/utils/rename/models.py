@@ -50,11 +50,15 @@ class RenamePlan:
     operations: List[RenameOperation] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     is_bdmv: bool = False
+    parse: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "root": str(self.root),
             "is_bdmv": self.is_bdmv,
             "operations": [operation.to_dict() for operation in self.operations],
             "warnings": list(self.warnings),
         }
+        if self.parse:
+            payload["parse"] = self.parse
+        return payload

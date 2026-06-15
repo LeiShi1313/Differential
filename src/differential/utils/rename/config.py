@@ -6,11 +6,13 @@ from typing import Dict, Iterable, Optional, Tuple
 from differential.constants import BOOLEAN_STATES
 from differential.utils.rename.formatter import normalize_audio_codec, normalize_token, normalize_video_codec
 from differential.utils.rename.models import CodecTokenMap
+from differential.utils.rename.words import RenameWords, ReplacementRule, WordRule
 
 
 RENAME_CONFIG_NAME = "config.ini"
 RENAME_SECTION = "Rename"
 CODEC_MAP_SECTION = "RenameCodecMap"
+WORDS_SECTION = "RenameWords"
 
 FIELD_ALIASES = {
     "source": "source",
@@ -41,6 +43,7 @@ class RenameConfig:
     path: Optional[Path] = None
     defaults: Dict[str, object] = field(default_factory=dict)
     codec_map: CodecTokenMap = field(default_factory=CodecTokenMap)
+    words: RenameWords = field(default_factory=RenameWords)
 
 
 def load_rename_config(config_path: Optional[str], cwd: Optional[Path] = None) -> RenameConfig:
@@ -55,7 +58,8 @@ def load_rename_config(config_path: Optional[str], cwd: Optional[Path] = None) -
 
     defaults = _parse_rename_defaults(parser)
     codec_map = _parse_codec_map(parser)
-    return RenameConfig(path=path, defaults=defaults, codec_map=codec_map)
+    words = _parse_rename_words(parser)
+    return RenameConfig(path=path, defaults=defaults, codec_map=codec_map, words=words)
 
 
 def apply_rename_config(args, config: RenameConfig) -> None:
@@ -64,6 +68,7 @@ def apply_rename_config(args, config: RenameConfig) -> None:
             setattr(args, key, value)
     setattr(args, "rename_config_path", config.path)
     setattr(args, "rename_codec_map", config.codec_map)
+    setattr(args, "rename_words", config.words)
     finalize_rename_args(args)
 
 
@@ -73,6 +78,8 @@ def finalize_rename_args(args) -> None:
             setattr(args, key, value)
     if not hasattr(args, "rename_codec_map"):
         setattr(args, "rename_codec_map", CodecTokenMap())
+    if not hasattr(args, "rename_words"):
+        setattr(args, "rename_words", RenameWords())
 
 
 def _resolve_config_path(config_path: Optional[str], cwd: Optional[Path]) -> Optional[Path]:
@@ -120,6 +127,67 @@ def _parse_codec_map(parser: RawConfigParser) -> CodecTokenMap:
         else:
             raise ValueError(f"unsupported [{CODEC_MAP_SECTION}] config key prefix: {key}")
     return CodecTokenMap(video=video, audio=audio)
+
+
+def _parse_rename_words(parser: RawConfigParser) -> RenameWords:
+    if not parser.has_section(WORDS_SECTION):
+        return RenameWords()
+
+    block = []
+    replace = []
+    warnings = []
+    for key, value in _section_items(parser, WORDS_SECTION):
+        normalized_key = key.strip().lower().replace("-", "_")
+        if normalized_key == "block":
+            block.extend(_parse_word_rules(value, warnings))
+        elif normalized_key == "replace":
+            replace.extend(_parse_replacement_rules(value, warnings))
+        else:
+            warnings.append(f"unsupported [{WORDS_SECTION}] config key ignored: {key}")
+    return RenameWords(block=tuple(block), replace=tuple(replace), warnings=tuple(warnings))
+
+
+def _parse_word_rules(value: str, warnings: list) -> list:
+    rules = []
+    for line in _word_lines(value):
+        is_regex, pattern = _split_rule_pattern(line)
+        if not pattern:
+            warnings.append("empty block rule ignored")
+            continue
+        rules.append(WordRule(pattern=pattern, is_regex=is_regex))
+    return rules
+
+
+def _parse_replacement_rules(value: str, warnings: list) -> list:
+    rules = []
+    for line in _word_lines(value):
+        if "=>" not in line:
+            warnings.append(f"invalid replace rule ignored: {line}")
+            continue
+        pattern_text, replacement = line.split("=>", 1)
+        is_regex, pattern = _split_rule_pattern(pattern_text.strip())
+        if not pattern:
+            warnings.append(f"invalid replace rule ignored: {line}")
+            continue
+        rules.append(ReplacementRule(pattern=pattern, replacement=replacement.strip(), is_regex=is_regex))
+    return rules
+
+
+def _word_lines(value: str) -> list:
+    lines = []
+    for line in str(value or "").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or stripped.startswith(";"):
+            continue
+        lines.append(stripped)
+    return lines
+
+
+def _split_rule_pattern(value: str) -> Tuple[bool, str]:
+    text = str(value or "").strip()
+    if text.lower().startswith("regex:"):
+        return True, text[6:].strip()
+    return False, text
 
 
 def _section_items(parser: RawConfigParser, section: str) -> Iterable[Tuple[str, str]]:

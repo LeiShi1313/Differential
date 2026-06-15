@@ -119,7 +119,7 @@ dft-rename /path/to/media --title "Movie Title" --year 2024 --source NF --type W
 dft-rename /path/to/media --title "Movie Title" --year 2024 --yes
 ```
 
-默认是交互式预览确认。`--dry-run` 只打印计划，`--json` 输出机器可读计划，`--yes` 直接执行且不会从旧文件名推断 `source` 或 `uploader`。如果当前工作目录存在 `config.ini`，`dft-rename` 会读取其中的 `[Rename]` 和 `[RenameCodecMap]`；也可以用 `--config /path/to/config.ini` 指定配置文件。命令行参数优先级高于配置文件。
+默认是交互式预览确认。`--dry-run` 只打印计划，`--json` 输出机器可读计划，`--yes` 直接执行且不会从旧文件名推断 `source` 或 `uploader`。如果当前工作目录存在 `config.ini`，`dft-rename` 会读取其中的 `[Rename]`、`[RenameWords]` 和 `[RenameCodecMap]`；也可以用 `--config /path/to/config.ini` 指定配置文件。命令行参数优先级高于配置文件。
 
 `[Rename]` 可设置常用默认 token，例如：
 
@@ -134,6 +134,18 @@ scan_bdinfo = true
 ```
 
 `source` 和 `type` 会分开输出，比如 `NF.WEB-DL`。不要把它们合成一个 `source = NF.WEB-DL`。
+
+`[RenameWords]` 会在解析旧文件名前运行，用来屏蔽不应处理的名称或修正常见噪声。`block` 先于 `replace` 执行；普通规则默认大小写不敏感；正则规则需要显式 `regex:` 前缀。
+
+```ini
+[RenameWords]
+block =
+    sample
+    regex:\btrailer\b
+replace =
+    WEB DL => WEB-DL
+    regex:\s+=> .
+```
 
 `[RenameCodecMap]` 用来定义偏好的最终视频/音频 codec 写法。映射发生在内置规范化之后：
 

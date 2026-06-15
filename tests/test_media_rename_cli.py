@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import tempfile
@@ -96,6 +97,56 @@ class MediaRenameCliTest(unittest.TestCase):
             self.assertEqual(code, 0)
             apply.assert_not_called()
 
+    def test_dry_run_json_includes_parse_diagnostics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "Example.Show.S01E01.2024.2160p.NF.WEB-DL.DDP5.1.Atmos.HEVC-GRP"
+            folder.mkdir()
+            main_file = folder / "Example.Show.S01E01.2024.2160p.NF.WEB-DL.DDP5.1.Atmos.HEVC-GRP.mkv"
+            main_file.write_bytes(b"video")
+            fake_scan = SimpleNamespace(
+                root=folder,
+                main_file=main_file,
+                media_files=[main_file],
+                is_bdmv=False,
+                is_direct_file=False,
+                resolution="2160p",
+                video_codec="",
+                audio_codec="",
+                hdr="",
+                release_type="",
+                handler=SimpleNamespace(cleanup=mock.Mock()),
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                with mock.patch("differential.rename_cli.scan_media", return_value=fake_scan):
+                    code = main(
+                        [
+                            str(folder),
+                            "--title",
+                            "Example Show",
+                            "--year",
+                            "2024",
+                            "--dry-run",
+                            "--json",
+                        ]
+                    )
+
+            self.assertEqual(code, 0)
+            payload = json.loads(stdout.getvalue())
+            parse_payload = payload["parse"]
+            self.assertEqual(parse_payload["original_name"], folder.name)
+            self.assertEqual(parse_payload["identity"]["title"], "Example Show")
+            self.assertEqual(parse_payload["identity"]["season"], 1)
+            self.assertEqual(parse_payload["identity"]["episode"], 1)
+            self.assertEqual(parse_payload["release_tokens"]["source"], "NF")
+            self.assertEqual(parse_payload["release_tokens"]["release_type"], "WEB-DL")
+            self.assertEqual(parse_payload["release_tokens"]["resolution"], "2160p")
+            self.assertEqual(parse_payload["release_tokens"]["audio_codec"], "DDP5.1.Atmos")
+            self.assertEqual(parse_payload["release_tokens"]["release_group"], "GRP")
+            self.assertEqual(parse_payload["selected_tokens"]["source"]["source"], "none")
+            self.assertEqual(parse_payload["selected_tokens"]["release_type"]["source"], "inferred")
+
     def test_manual_metadata_fills_season_from_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp) / "Existing.Release.S03.2024.1080p.WEB-DL"
@@ -156,6 +207,62 @@ class MediaRenameCliTest(unittest.TestCase):
 
             self.assertEqual(code, 0)
             self.assertIn("Movie.Title.2024.1080p.NF.WEB-DL.H264.AAC-CFG", stdout.getvalue())
+
+    def test_rename_words_replace_before_parse_and_report_applied_rule(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root / "Movie.2024.WEB DL.1080p-GRP"
+            folder.mkdir()
+            main_file = folder / "Movie.2024.WEB DL.1080p-GRP.mkv"
+            main_file.write_bytes(b"video")
+            (root / "config.ini").write_text(
+                "\n".join(
+                    [
+                        "[RenameWords]",
+                        "replace =",
+                        "    WEB DL => WEB-DL",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            fake_scan = _fake_scan(folder, main_file)
+
+            stdout = StringIO()
+            with _pushd(root), redirect_stdout(stdout):
+                with mock.patch("differential.rename_cli.scan_media", return_value=fake_scan):
+                    code = main([str(folder), "--title", "Movie Title", "--year", "2024", "--dry-run", "--json"])
+
+            self.assertEqual(code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["parse"]["release_tokens"]["release_type"], "WEB-DL")
+            self.assertEqual(payload["parse"]["applied_words"], ["replace:WEB DL"])
+
+    def test_rename_words_block_stops_planning_without_crashing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root / "Movie.Sample.2024"
+            folder.mkdir()
+            main_file = folder / "Movie.Sample.2024.mkv"
+            main_file.write_bytes(b"video")
+            (root / "config.ini").write_text(
+                "\n".join(
+                    [
+                        "[RenameWords]",
+                        "block =",
+                        "    sample",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            fake_scan = _fake_scan(folder, main_file)
+
+            stderr = StringIO()
+            with _pushd(root), redirect_stderr(stderr):
+                with mock.patch("differential.rename_cli.scan_media", return_value=fake_scan):
+                    code = main([str(folder), "--title", "Movie Title", "--year", "2024", "--dry-run"])
+
+            self.assertEqual(code, 1)
+            self.assertIn("blocked by [RenameWords] rule: sample", stderr.getvalue())
 
     def test_cli_values_override_current_folder_config(self):
         with tempfile.TemporaryDirectory() as tmp:
