@@ -571,6 +571,29 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         return self.ptgen_handler.fetch_ptgen_reference(reference)
 
     @property
+    def is_bdmv(self):
+        return getattr(self.mediainfo_handler, "is_bdmv", False)
+
+    @property
+    def _mediainfo(self):
+        return getattr(self.mediainfo_handler, "mediainfo", None)
+
+    @property
+    def _bdinfo(self):
+        return getattr(self.mediainfo_handler, "bdinfo", None)
+
+    @property
+    def _screenshots(self):
+        return getattr(self.screenshot_handler, "screenshots", [])
+
+    @property
+    def _imdb(self):
+        imdb = getattr(self, "imdb", None)
+        if isinstance(imdb, dict):
+            return imdb
+        return getattr(imdb, "__dict__", {}) if imdb is not None else {}
+
+    @property
     def parsed_encoder_log(self):
         return parse_encoder_log(self.encoder_log)
 
