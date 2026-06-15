@@ -1,4 +1,7 @@
 import argparse
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from io import StringIO
@@ -8,6 +11,7 @@ from unittest import mock
 from differential.commands import PARSER
 from differential.doctor import (
     Diagnostic,
+    _check_bdinfo,
     _check_config,
     _check_image_host_config,
     run_doctor,
@@ -88,6 +92,31 @@ class DoctorTest(unittest.TestCase):
         self.assertIn("cloudinary_cloud_name", diagnostic.message)
         self.assertIn("cloudinary_api_secret", diagnostic.message)
 
+    def test_image_host_config_requires_smms_api_key(self):
+        diagnostic = _check_image_host_config({"image_hosting": "smms"})
+
+        self.assertEqual(diagnostic.status, "fail")
+        self.assertIn("smms_api_key", diagnostic.message)
+
+    def test_bdinfo_check_matches_runtime_current_directory_lookup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_cwd = Path.cwd()
+            try:
+                os.chdir(tmp)
+                bdinfo = Path(tmp) / "BDInfo"
+                bdinfo.write_text("#!/bin/sh\n", encoding="utf-8")
+
+                with mock.patch("differential.doctor.shutil.which", return_value=None), mock.patch(
+                    "differential.doctor._bdinfo_env_path",
+                    return_value=None,
+                ):
+                    diagnostic = _check_bdinfo()
+            finally:
+                os.chdir(old_cwd)
+
+        self.assertEqual(diagnostic.status, "ok")
+        self.assertEqual(diagnostic.message, str(bdinfo))
+
     def test_run_doctor_prints_diagnostics_and_returns_failure(self):
         diagnostics = [
             Diagnostic("ffmpeg", "ok", "/usr/bin/ffmpeg"),
@@ -102,6 +131,25 @@ class DoctorTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("[OK] ffmpeg: /usr/bin/ffmpeg", stdout.getvalue())
         self.assertIn("[FAIL] config: bad config", stdout.getvalue())
+
+    def test_module_execution_preserves_doctor_exit_code(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            missing_config = Path(tmp) / "missing.ini"
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "differential.main",
+                    "doctor",
+                    "-c",
+                    str(missing_config),
+                ],
+                text=True,
+                capture_output=True,
+            )
+
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("[FAIL] config:", proc.stdout)
 
 
 if __name__ == "__main__":

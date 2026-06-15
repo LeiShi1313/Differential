@@ -55,6 +55,10 @@ def _check_bdinfo() -> Diagnostic:
         return Diagnostic("BDInfo", "fail", f"{BDINFO_ENV_VAR} points to a missing file: {env_path}")
 
     for name in BDINFO_BINARY_NAMES:
+        cwd_candidate = Path.cwd().joinpath(name)
+        if cwd_candidate.is_file():
+            return Diagnostic("BDInfo", "ok", str(cwd_candidate))
+
         path = shutil.which(name)
         if path:
             return Diagnostic("BDInfo", "ok", path)
@@ -161,6 +165,8 @@ def _missing_image_host_keys(image_hosting: ImageHosting, config: dict) -> list[
         return missing
     if image_hosting == ImageHosting.IMGURL:
         return _missing(config, ["imgurl_hosting_url", "imgurl_api_key"])
+    if image_hosting == ImageHosting.SMMS:
+        return _missing(config, ["smms_api_key"])
     if image_hosting == ImageHosting.BYR:
         return _missing(config, ["byr_cookie"])
     if image_hosting == ImageHosting.CLOUDINARY:
