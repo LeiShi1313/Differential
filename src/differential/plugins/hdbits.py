@@ -23,17 +23,17 @@ class HDBits(Base):
 
     @property
     def media_info(self):
-        if self.is_bdmv:
+        if self.mediainfo_handler.is_bdmv:
             return ''
         else:
-            return get_full_mediainfo(self._mediainfo)
+            return get_full_mediainfo(self.mediainfo_handler.mediainfo)
 
 
     @property
     def description(self):
         description = ''
-        if self.is_bdmv:
-            description += "[quote]{}[/quote]\n\n".format(self._bdinfo)
+        if self.mediainfo_handler.is_bdmv:
+            description += "[quote]{}[/quote]\n\n".format(self.mediainfo_handler.bdinfo)
         # TODO: missing encoder log
-        description += "\n".join([f"{uploaded}" for uploaded in self._screenshots])
+        description += "\n".join([f"{uploaded}" for uploaded in self.screenshot_handler.screenshots])
         return description

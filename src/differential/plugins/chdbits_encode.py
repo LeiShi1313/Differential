@@ -94,22 +94,19 @@ class CHDBitsEncode(CHDBits):
         if imdb_rating:
             media_info += f"iMDB RATiNG.....: {imdb_rating}\n"
 
-        genre = self._imdb.get("genre")
+        genre = self.imdb.genre
         if genre:
             media_info += f"GENRE...........: {','.join(genre)}\n"
-        else:
-            genre = self.imdb.genre
-            if genre:
-                media_info += f"GENRE...........: {','.join(genre)}\n"
 
         if self.source_name:
             media_info += f"SOURCE..........: {self.source_name} (Thanks)\n"
 
-        for track in self._mediainfo.general_tracks:
+        mediainfo = self.mediainfo_handler.mediainfo
+        for track in mediainfo.general_tracks:
             # TODO(leshi1313): Format it by yourself
             media_info += f"RUNTiME.........: {track.other_duration[0]}\n"
             media_info += f"FilE SiZE.......: {track.other_file_size[0]}\n"
-        for track in self._mediainfo.video_tracks:
+        for track in mediainfo.video_tracks:
             media_info += (
                 f"ViDEO BiTRATE...: "
                 f"{track.encoded_library_name if track.encoded_library_name else track.commercial_name} {track.format_profile} "
@@ -119,34 +116,34 @@ class CHDBitsEncode(CHDBits):
             media_info += f"ASPECT RATiO....: {track.other_display_aspect_ratio[0]}\n"
             media_info += f"RESOLUTiON......: {track.width}x{track.height}\n"
 
-        for idx, track in enumerate(self._mediainfo.audio_tracks):
+        for idx, track in enumerate(mediainfo.audio_tracks):
             if track.other_language and len(track.other_language) > 1:
                 media_info += (
-                    f"AUDiO...........: {'#'+str(idx+1) if len(self._mediainfo.audio_tracks) > 1 else ''} "
+                    f"AUDiO...........: {'#'+str(idx+1) if len(mediainfo.audio_tracks) > 1 else ''} "
                     f"{track.other_language[0]} "
                     f"{track.commercial_name} {track.other_channel_s[0]} "
                     f"@ {track.other_bit_rate[0]}\n"
                 )
             else:
                 media_info += (
-                    f"AUDiO...........: {'#'+str(idx+1) if len(self._mediainfo.audio_tracks) > 1 else ''} "
+                    f"AUDiO...........: {'#'+str(idx+1) if len(mediainfo.audio_tracks) > 1 else ''} "
                     f"{track.commercial_name} {track.other_channel_s[0]} "
                     f"@ {track.other_bit_rate[0]}\n"
                 )
 
-        if len(self._mediainfo.text_tracks):
+        if len(mediainfo.text_tracks):
             media_info += "SUBTiTLES.......: {}\n".format(
             " | ".join(
                 [
                     f"{track.other_language[0]} {track.format} {track.title if track.title else ''}"
                     if track.other_language and len(track.other_language) > 1
                     else f"{track.format} {track.title if track.title else ''}"
-                    for track in self._mediainfo.text_tracks
+                    for track in mediainfo.text_tracks
                 ]
             )
         )
 
-        for track in self._mediainfo.menu_tracks:
+        for track in mediainfo.menu_tracks:
             if track.chapters_pos_end and track.chapters_pos_begin:
                 media_info += f"CHAPTERS........: {int(track.chapters_pos_end) - int(track.chapters_pos_begin)}\n"
 
@@ -171,7 +168,7 @@ class CHDBitsEncode(CHDBits):
             "该下载内容仅做宽带测试使用，请在下载后24小时内删除。请购买正版！[/b][/color][/quote]".format(
                 self.ptgen.format,
                 self.media_info + "\n\n" + self.parsed_encoder_log,
-                "\n".join([f"{uploaded}" for uploaded in self._screenshots]),
+                "\n".join([f"{uploaded}" for uploaded in self.screenshot_handler.screenshots]),
             )
         )
 

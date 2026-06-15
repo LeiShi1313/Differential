@@ -83,7 +83,7 @@ class LegacyPluginCompatTest(unittest.TestCase):
         with mock.patch("differential.plugins.hdbits.get_full_mediainfo", return_value="media info") as full:
             self.assertEqual(plugin.media_info, "media info")
 
-        full.assert_called_once_with(plugin._mediainfo)
+        full.assert_called_once_with(plugin.mediainfo_handler.mediainfo)
 
         plugin.mediainfo_handler.is_bdmv = True
         self.assertEqual(plugin.media_info, "")
