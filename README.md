@@ -119,7 +119,7 @@ dft-rename /path/to/media --title "Movie Title" --year 2024 --source NF --type W
 dft-rename /path/to/media --title "Movie Title" --year 2024 --yes
 ```
 
-默认是交互式预览确认。`--dry-run` 只打印计划，`--json` 输出机器可读计划，`--yes` 直接执行且不会从旧文件名推断 `source` 或 `uploader`。如果当前工作目录存在 `config.ini`，`dft-rename` 会读取其中的 `[Rename]`、`[RenameWords]` 和 `[RenameCodecMap]`；也可以用 `--config /path/to/config.ini` 指定配置文件。命令行参数优先级高于配置文件。
+默认是交互式预览确认。`--dry-run` 只打印计划，`--json` 输出机器可读计划，`--yes` 直接执行且不会从旧文件名推断 `source` 或 `uploader`。如果当前工作目录存在 `config.ini`，`dft-rename` 会读取其中的 `[Rename]`、`[RenameWords]`、`[RenameReleaseGroups]` 和 `[RenameCodecMap]`；也可以用 `--config /path/to/config.ini` 指定配置文件。命令行参数优先级高于配置文件。
 
 `[Rename]` 可设置常用默认 token，例如：
 
@@ -145,6 +145,16 @@ block =
 replace =
     WEB DL => WEB-DL
     regex:\s+=> .
+```
+
+`[RenameReleaseGroups]` 可配置项目自有 release group/uploader 名称。配置后会优先用这里的规范写法；未命中时仍会保留保守的末尾 `-GROUP` / `@GROUP` 识别。`--yes` 仍不会自动采用旧文件名推断出的 uploader。
+
+```ini
+[RenameReleaseGroups]
+groups =
+    UBits
+    ADWeb
+    HDSWEB
 ```
 
 `[RenameCodecMap]` 用来定义偏好的最终视频/音频 codec 写法。映射发生在内置规范化之后：

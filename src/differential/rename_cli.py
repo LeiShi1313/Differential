@@ -130,7 +130,7 @@ def build_plan_from_args(args: argparse.Namespace):
 
     scan = scan_media(path, scan_bdinfo=args.scan_bdinfo)
     metadata = _metadata_from_args(args, word_application.name)
-    suggestions = suggest_tokens(word_application.name)
+    suggestions = suggest_tokens(word_application.name, args.rename_release_groups)
     tokens = _tokens_from_args(args, scan, suggestions, prompts_allowed=should_prompt(args))
     plan = build_rename_plan(
         scan,
@@ -237,7 +237,7 @@ def _json_payload(plan, applied) -> str:
 
 def _parse_diagnostics(args: argparse.Namespace, scan, suggestions, tokens: TechnicalTokens, word_application) -> dict:
     parsed = parse_media_name(word_application.name)
-    release_tokens = parse_release_tokens(word_application.name)
+    release_tokens = parse_release_tokens(word_application.name, args.rename_release_groups)
     return {
         "original_name": word_application.original_name,
         "clean_name": parsed.clean_name,

@@ -9,9 +9,9 @@ from differential.utils.rename.formatter import (
     normalize_resolution,
     normalize_token,
     normalize_type,
-    normalize_uploader,
     normalize_video_codec,
 )
+from differential.utils.rename.release_groups import ReleaseGroupConfig, match_release_group
 
 
 SOURCE_TOKENS = {
@@ -106,33 +106,6 @@ FLAC_RE = re.compile(r"\bFLAC\b", re.IGNORECASE)
 LPCM_RE = re.compile(r"\bLPCM\b|\bPCM\b", re.IGNORECASE)
 DTS_RE = re.compile(r"\bDTS(?:[ ._-]?(?P<ch>[257](?:[ ._-]?[01])))?", re.IGNORECASE)
 
-TECHNICAL_UPLOADER_KEYS = {
-    "dl",
-    "rip",
-    "hd",
-    "ma",
-    "hdr",
-    "hdr10",
-    "hdr10plus",
-    "dv",
-    "dovi",
-    "hevc",
-    "h264",
-    "h265",
-    "x264",
-    "x265",
-    "avc",
-    "aac",
-    "ac3",
-    "dd",
-    "ddp",
-    "dts",
-    "dtshd",
-    "dtshdma",
-    "truehd",
-}
-
-
 @dataclass(frozen=True)
 class ParsedReleaseTokens:
     source: str = ""
@@ -143,6 +116,8 @@ class ParsedReleaseTokens:
     audio_codec: str = ""
     edition: str = ""
     release_group: str = ""
+    release_group_source: str = ""
+    release_group_confidence: str = ""
     uploader: str = ""
     season_end: int = 0
     episode_end: int = 0
@@ -161,9 +136,9 @@ class ParsedReleaseTokens:
         return payload
 
 
-def parse_release_tokens(path_or_name) -> ParsedReleaseTokens:
+def parse_release_tokens(path_or_name, release_groups: ReleaseGroupConfig = None) -> ParsedReleaseTokens:
     name = _name_from_path(path_or_name)
-    uploader = _find_uploader(name)
+    group_match = match_release_group(name, release_groups)
     return ParsedReleaseTokens(
         source=_first(find_sources(name)),
         release_type=_first(find_release_types(name)),
@@ -172,8 +147,11 @@ def parse_release_tokens(path_or_name) -> ParsedReleaseTokens:
         hdr=_first(find_hdr_values(name)),
         audio_codec=_first(find_audio_codecs(name)),
         edition=_first(find_editions(name)),
-        release_group=uploader,
-        uploader=uploader,
+        release_group=group_match.value,
+        release_group_source=group_match.source,
+        release_group_confidence=group_match.confidence,
+        uploader=group_match.value,
+        warnings=group_match.warnings,
     )
 
 
@@ -254,35 +232,9 @@ def find_editions(name: str) -> List[str]:
     return _unique(normalize_token(value) for value in _find_by_patterns(name, EDITION_PATTERNS))
 
 
-def find_uploaders(name: str) -> List[str]:
-    uploader = _find_uploader(name)
-    return [uploader] if uploader else []
-
-
-def _find_uploader(name: str) -> str:
-    hyphen_match = re.search(r"-([A-Za-z0-9][A-Za-z0-9._@+]{1,40})$", name)
-    if hyphen_match:
-        candidate = normalize_uploader(hyphen_match.group(1))
-        if candidate and not _is_technical_uploader_candidate(candidate):
-            return candidate
-
-    at_match = re.search(r"@([A-Za-z0-9][A-Za-z0-9._+-]{1,40})$", name)
-    if at_match:
-        candidate = normalize_uploader(at_match.group(1))
-        if candidate and not _is_technical_uploader_candidate(candidate):
-            return candidate
-    return ""
-
-
-def _is_technical_uploader_candidate(value: str) -> bool:
-    key = re.sub(r"[\s._@+-]+", "", str(value or "").lower())
-    if key in TECHNICAL_UPLOADER_KEYS:
-        return True
-    if key.startswith("hdma") or key.startswith("ma"):
-        return True
-    if key.startswith(("ddp", "dts", "truehd")) and re.search(r"\d[._-]?\d$", value):
-        return True
-    return False
+def find_uploaders(name: str, release_groups: ReleaseGroupConfig = None) -> List[str]:
+    group_match = match_release_group(name, release_groups)
+    return [group_match.value] if group_match.value else []
 
 
 def _find_by_patterns(name: str, patterns) -> List[str]:

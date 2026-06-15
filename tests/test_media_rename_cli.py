@@ -264,6 +264,38 @@ class MediaRenameCliTest(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertIn("blocked by [RenameWords] rule: sample", stderr.getvalue())
 
+    def test_configured_release_group_is_reported_in_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root / "Movie.2024.1080p.WEB-DL.H264.mygrp"
+            folder.mkdir()
+            main_file = folder / "Movie.2024.1080p.WEB-DL.H264.mygrp.mkv"
+            main_file.write_bytes(b"video")
+            (root / "config.ini").write_text(
+                "\n".join(
+                    [
+                        "[RenameReleaseGroups]",
+                        "groups =",
+                        "    MyGrp",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            fake_scan = _fake_scan(folder, main_file)
+
+            stdout = StringIO()
+            with _pushd(root), redirect_stdout(stdout):
+                with mock.patch("differential.rename_cli.scan_media", return_value=fake_scan):
+                    code = main([str(folder), "--title", "Movie Title", "--year", "2024", "--dry-run", "--json"])
+
+            self.assertEqual(code, 0)
+            payload = json.loads(stdout.getvalue())
+            release_tokens = payload["parse"]["release_tokens"]
+            self.assertEqual(release_tokens["release_group"], "MyGrp")
+            self.assertEqual(release_tokens["release_group_source"], "custom")
+            self.assertEqual(release_tokens["release_group_confidence"], "high")
+            self.assertEqual(payload["parse"]["selected_tokens"]["uploader"]["source"], "none")
+
     def test_cli_values_override_current_folder_config(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

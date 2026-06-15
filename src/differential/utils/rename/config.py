@@ -6,6 +6,7 @@ from typing import Dict, Iterable, Optional, Tuple
 from differential.constants import BOOLEAN_STATES
 from differential.utils.rename.formatter import normalize_audio_codec, normalize_token, normalize_video_codec
 from differential.utils.rename.models import CodecTokenMap
+from differential.utils.rename.release_groups import ReleaseGroupConfig
 from differential.utils.rename.words import RenameWords, ReplacementRule, WordRule
 
 
@@ -13,6 +14,7 @@ RENAME_CONFIG_NAME = "config.ini"
 RENAME_SECTION = "Rename"
 CODEC_MAP_SECTION = "RenameCodecMap"
 WORDS_SECTION = "RenameWords"
+RELEASE_GROUPS_SECTION = "RenameReleaseGroups"
 
 FIELD_ALIASES = {
     "source": "source",
@@ -44,6 +46,7 @@ class RenameConfig:
     defaults: Dict[str, object] = field(default_factory=dict)
     codec_map: CodecTokenMap = field(default_factory=CodecTokenMap)
     words: RenameWords = field(default_factory=RenameWords)
+    release_groups: ReleaseGroupConfig = field(default_factory=ReleaseGroupConfig)
 
 
 def load_rename_config(config_path: Optional[str], cwd: Optional[Path] = None) -> RenameConfig:
@@ -59,7 +62,8 @@ def load_rename_config(config_path: Optional[str], cwd: Optional[Path] = None) -
     defaults = _parse_rename_defaults(parser)
     codec_map = _parse_codec_map(parser)
     words = _parse_rename_words(parser)
-    return RenameConfig(path=path, defaults=defaults, codec_map=codec_map, words=words)
+    release_groups = _parse_release_groups(parser)
+    return RenameConfig(path=path, defaults=defaults, codec_map=codec_map, words=words, release_groups=release_groups)
 
 
 def apply_rename_config(args, config: RenameConfig) -> None:
@@ -69,6 +73,7 @@ def apply_rename_config(args, config: RenameConfig) -> None:
     setattr(args, "rename_config_path", config.path)
     setattr(args, "rename_codec_map", config.codec_map)
     setattr(args, "rename_words", config.words)
+    setattr(args, "rename_release_groups", config.release_groups)
     finalize_rename_args(args)
 
 
@@ -80,6 +85,8 @@ def finalize_rename_args(args) -> None:
         setattr(args, "rename_codec_map", CodecTokenMap())
     if not hasattr(args, "rename_words"):
         setattr(args, "rename_words", RenameWords())
+    if not hasattr(args, "rename_release_groups"):
+        setattr(args, "rename_release_groups", ReleaseGroupConfig())
 
 
 def _resolve_config_path(config_path: Optional[str], cwd: Optional[Path]) -> Optional[Path]:
@@ -147,6 +154,26 @@ def _parse_rename_words(parser: RawConfigParser) -> RenameWords:
     return RenameWords(block=tuple(block), replace=tuple(replace), warnings=tuple(warnings))
 
 
+def _parse_release_groups(parser: RawConfigParser) -> ReleaseGroupConfig:
+    if not parser.has_section(RELEASE_GROUPS_SECTION):
+        return ReleaseGroupConfig()
+
+    groups = []
+    warnings = []
+    for key, value in _section_items(parser, RELEASE_GROUPS_SECTION):
+        normalized_key = key.strip().lower().replace("-", "_")
+        if normalized_key != "groups":
+            warnings.append(f"unsupported [{RELEASE_GROUPS_SECTION}] config key ignored: {key}")
+            continue
+        for line in _word_lines(value):
+            group = normalize_token(line)
+            if group:
+                groups.append(group)
+            else:
+                warnings.append("empty release group ignored")
+    return ReleaseGroupConfig(groups=tuple(_unique(groups)), warnings=tuple(warnings))
+
+
 def _parse_word_rules(value: str, warnings: list) -> list:
     rules = []
     for line in _word_lines(value):
@@ -188,6 +215,17 @@ def _split_rule_pattern(value: str) -> Tuple[bool, str]:
     if text.lower().startswith("regex:"):
         return True, text[6:].strip()
     return False, text
+
+
+def _unique(values) -> list:
+    result = []
+    seen = set()
+    for value in values:
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
 
 
 def _section_items(parser: RawConfigParser, section: str) -> Iterable[Tuple[str, str]]:

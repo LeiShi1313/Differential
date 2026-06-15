@@ -75,6 +75,14 @@ source_name = HDTV
 ;     WEB DL => WEB-DL
 ;     regex:\s+=> .
 
+[RenameReleaseGroups]
+; 可选的项目自有 release group/uploader 白名单。配置后会优先用这里的规范写法；
+; 未配置或未命中时仍会保留保守的末尾 -GROUP / @GROUP 识别。
+; groups =
+;     UBits
+;     ADWeb
+;     HDSWEB
+
 [RenameCodecMap]
 ; dft-rename 会先做内置规范化，再用这里的映射改成你偏好的最终 token。
 ; 左侧格式为 video.<规范化或常见写法> / audio.<规范化或常见写法>，右侧为最终输出。

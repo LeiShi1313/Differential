@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from differential.utils.rename.release_groups import ReleaseGroupConfig
 from differential.utils.rename.release_tokens import parse_release_tokens
 
 
@@ -57,6 +58,39 @@ class MediaReleaseTokensTest(unittest.TestCase):
 
         self.assertEqual(tokens.release_type, "WEB-DL")
         self.assertEqual(tokens.uploader, "")
+
+    def test_custom_release_group_canonicalizes_suffix(self):
+        tokens = parse_release_tokens(
+            "Movie.2024.1080p.WEB-DL.H264-mygrp",
+            release_groups=ReleaseGroupConfig(groups=("MyGrp",)),
+        )
+
+        self.assertEqual(tokens.release_group, "MyGrp")
+        self.assertEqual(tokens.uploader, "MyGrp")
+        self.assertEqual(tokens.release_group_source, "custom")
+        self.assertEqual(tokens.release_group_confidence, "high")
+
+    def test_custom_release_group_matches_final_token(self):
+        tokens = parse_release_tokens(
+            "Movie.2024.1080p.WEB-DL.H264.ADWeb",
+            release_groups=ReleaseGroupConfig(groups=("ADWeb",)),
+        )
+
+        self.assertEqual(tokens.release_group, "ADWeb")
+        self.assertEqual(tokens.release_group_source, "custom")
+
+    def test_unconfigured_suffix_is_lower_confidence_fallback(self):
+        tokens = parse_release_tokens("Movie.2024.1080p.WEB-DL.H264-GRP")
+
+        self.assertEqual(tokens.release_group, "GRP")
+        self.assertEqual(tokens.release_group_source, "suffix")
+        self.assertEqual(tokens.release_group_confidence, "medium")
+
+    def test_at_suffix_wins_over_earlier_hyphen(self):
+        tokens = parse_release_tokens("Movie.2024.2160p.WEB-DL.H265.HDR.DV-DIY@HDSWEB")
+
+        self.assertEqual(tokens.release_group, "HDSWEB")
+        self.assertEqual(tokens.release_group_source, "suffix")
 
 
 if __name__ == "__main__":
