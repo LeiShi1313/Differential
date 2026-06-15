@@ -5,8 +5,15 @@ from types import SimpleNamespace
 from unittest import mock
 
 from differential.plugins.chdbits_encode import CHDBitsEncode
+from differential.plugins.chdbits import CHDBits
+from differential.plugins.gazelle import Gazelle
+from differential.plugins.greatposterwall import GreatPosterWall
 from differential.plugins.hdbits import HDBits
 from differential.plugins.nexusphp import NexusPHP
+from differential.plugins.ptp import PassThePopcorn
+from differential.plugins.pterclub import PTerClub
+from differential.plugins.unit3d import Unit3D
+from differential.plugin_register import REGISTERED_PLUGINS
 from differential.utils.ptgen.imdb import IMDBData
 
 
@@ -16,6 +23,30 @@ class UploadedStub:
 
 
 class LegacyPluginCompatTest(unittest.TestCase):
+    def test_builtin_plugins_are_registered_and_constructable(self):
+        cases = [
+            (NexusPHP, {"upload_url": "https://example.test/upload.php"}),
+            (Gazelle, {"upload_url": "https://example.test/upload.php"}),
+            (Unit3D, {"upload_url": "https://example.test/upload.php"}),
+            (PassThePopcorn, {}),
+            (HDBits, {}),
+            (CHDBits, {}),
+            (GreatPosterWall, {}),
+            (PTerClub, {}),
+            (CHDBitsEncode, {"source_name": "Source Disc"}),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            for plugin_cls, kwargs in cases:
+                with self.subTest(plugin=plugin_cls.__name__):
+                    self.assertIs(REGISTERED_PLUGINS[plugin_cls.__name__], plugin_cls)
+                    self.assertIs(REGISTERED_PLUGINS[plugin_cls.__name__.lower()], plugin_cls)
+                    plugin = plugin_cls(folder=tmp, **kwargs)
+                    self.assertEqual(plugin.folder, Path(tmp))
+                    self.assertIsNotNone(plugin.mediainfo_handler)
+                    self.assertIsNotNone(plugin.ptgen_handler)
+                    self.assertIsNotNone(plugin.screenshot_handler)
+
     def test_base_exposes_legacy_handler_aliases(self):
         with tempfile.TemporaryDirectory() as tmp:
             plugin = NexusPHP(folder=tmp, upload_url="https://example.test/upload.php")
