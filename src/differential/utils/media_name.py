@@ -255,6 +255,10 @@ def _name_from_path(path_or_name: PathLike) -> str:
 
 
 def _strip_known_extension(name: str) -> tuple[str, str]:
+    return strip_known_extension(name)
+
+
+def strip_known_extension(name: str) -> tuple[str, str]:
     suffix = Path(name).suffix
     if suffix.lower() in MEDIA_EXTENSIONS | SUBTITLE_EXTENSIONS | NON_MEDIA_EXTENSIONS:
         return name[: -len(suffix)], suffix

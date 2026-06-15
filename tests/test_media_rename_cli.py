@@ -264,6 +264,34 @@ class MediaRenameCliTest(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertIn("blocked by [RenameWords] rule: sample", stderr.getvalue())
 
+    def test_plain_dry_run_prints_parse_warnings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root / "Movie.2024.1080p.WEB-DL"
+            folder.mkdir()
+            main_file = folder / "Movie.2024.1080p.WEB-DL.mkv"
+            main_file.write_bytes(b"video")
+            (root / "config.ini").write_text(
+                "\n".join(
+                    [
+                        "[RenameWords]",
+                        "block =",
+                        "    regex:[",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            fake_scan = _fake_scan(folder, main_file)
+
+            stdout = StringIO()
+            with _pushd(root), redirect_stdout(stdout):
+                with mock.patch("differential.rename_cli.scan_media", return_value=fake_scan):
+                    code = main([str(folder), "--title", "Movie Title", "--year", "2024", "--dry-run"])
+
+            self.assertEqual(code, 0)
+            self.assertIn("Warnings:", stdout.getvalue())
+            self.assertIn("invalid block regex ignored: [", stdout.getvalue())
+
     def test_configured_release_group_is_reported_in_json(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

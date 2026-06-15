@@ -86,6 +86,21 @@ class MediaReleaseTokensTest(unittest.TestCase):
         self.assertEqual(tokens.release_group_source, "suffix")
         self.assertEqual(tokens.release_group_confidence, "medium")
 
+    def test_release_group_suffix_before_media_extension_is_detected(self):
+        tokens = parse_release_tokens("Movie.2024.1080p.WEB-DL.H264-GRP.mkv")
+
+        self.assertEqual(tokens.release_group, "GRP")
+        self.assertEqual(tokens.release_group_source, "suffix")
+
+    def test_custom_release_group_before_media_extension_is_detected(self):
+        tokens = parse_release_tokens(
+            "Movie.2024.1080p.WEB-DL.H264.mygrp.mkv",
+            release_groups=ReleaseGroupConfig(groups=("MyGrp",)),
+        )
+
+        self.assertEqual(tokens.release_group, "MyGrp")
+        self.assertEqual(tokens.release_group_source, "custom")
+
     def test_at_suffix_wins_over_earlier_hyphen(self):
         tokens = parse_release_tokens("Movie.2024.2160p.WEB-DL.H265.HDR.DV-DIY@HDSWEB")
 

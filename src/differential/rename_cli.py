@@ -140,7 +140,7 @@ def build_plan_from_args(args: argparse.Namespace):
         folder_only=args.folder_only,
         codec_map=args.rename_codec_map,
     )
-    plan.parse = _parse_diagnostics(args, scan, suggestions, tokens, word_application)
+    _attach_parse_diagnostics(plan, _parse_diagnostics(args, scan, suggestions, tokens, word_application))
     return plan, scan
 
 
@@ -254,6 +254,13 @@ def _parse_diagnostics(args: argparse.Namespace, scan, suggestions, tokens: Tech
         "applied_words": list(word_application.applied),
         "warnings": _unique_list(list(word_application.warnings) + list(parsed.warnings) + list(release_tokens.warnings)),
     }
+
+
+def _attach_parse_diagnostics(plan, diagnostics: dict) -> None:
+    plan.parse = diagnostics
+    for warning in diagnostics.get("warnings", []):
+        if warning not in plan.warnings:
+            plan.warnings.append(warning)
 
 
 def _selected_token_sources(args: argparse.Namespace, scan, suggestions, tokens: TechnicalTokens) -> dict:

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from differential.utils.media_name import strip_known_extension
 from differential.utils.rename.formatter import normalize_uploader
 
 
@@ -134,9 +135,11 @@ def _group_key(value: str) -> str:
 
 def _name_from_path(path_or_name) -> str:
     if isinstance(path_or_name, Path):
-        return path_or_name.name
+        name = path_or_name.name
+        return strip_known_extension(name)[0]
     text = str(path_or_name or "").strip().replace("\\", "/").rstrip("/")
-    return text.rsplit("/", 1)[-1] if "/" in text else text
+    name = text.rsplit("/", 1)[-1] if "/" in text else text
+    return strip_known_extension(name)[0]
 
 
 def _unique(values) -> List[str]:
