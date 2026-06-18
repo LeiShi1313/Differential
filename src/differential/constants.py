@@ -50,7 +50,7 @@ SCREENSHOT_TONEMAP_STATES = {
     "disabled": "never",
 }
 
-URL_SHORTENER_PATH = "https://2cn.io"
+URL_SHORTENER_PATH = "https://r.leishi.xyz"
 
 
 class ImageHosting(Enum):
