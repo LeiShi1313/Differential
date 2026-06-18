@@ -60,6 +60,13 @@ def merge_config(args: argparse.Namespace, section: str = '') -> dict:
     for arg in vars(args):
         merged[arg] = getattr(args, arg)
 
+    # The CLI exposes these as a mutually-exclusive group. If one is present,
+    # it should override the other value that may have come from config.
+    if getattr(args, "easy_upload", False):
+        merged["auto_feed"] = False
+    if getattr(args, "auto_feed", False):
+        merged["easy_upload"] = False
+
     # Handling non-str non-int args
     if 'image_hosting' in merged:
         merged['image_hosting'] = ImageHosting.parse(merged['image_hosting'])

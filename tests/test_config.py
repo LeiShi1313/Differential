@@ -54,6 +54,38 @@ class ConfigTest(unittest.TestCase):
 
         self.assertEqual(merged["upload_url"], "https://tjupt.org/upload.php")
 
+    def test_cli_auto_feed_overrides_config_easy_upload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "config.ini"
+            config.write_text(
+                "[NexusPHP]\n"
+                "easy_upload = true\n",
+                encoding="utf-8",
+            )
+
+            merged = merge_config(
+                Namespace(config=str(config), plugin="NexusPHP", auto_feed=True)
+            )
+
+        self.assertIs(merged["easy_upload"], False)
+        self.assertIs(merged["auto_feed"], True)
+
+    def test_cli_easy_upload_overrides_config_auto_feed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "config.ini"
+            config.write_text(
+                "[NexusPHP]\n"
+                "auto_feed = true\n",
+                encoding="utf-8",
+            )
+
+            merged = merge_config(
+                Namespace(config=str(config), plugin="NexusPHP", easy_upload=True)
+            )
+
+        self.assertIs(merged["easy_upload"], True)
+        self.assertIs(merged["auto_feed"], False)
+
     def test_screenshot_tonemap_boolean_aliases(self):
         for value, expected in (("true", "always"), ("false", "never")):
             with self.subTest(value=value):
