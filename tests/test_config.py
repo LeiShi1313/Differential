@@ -46,6 +46,14 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(merged["screenshot_tonemap"], "auto")
         self.assertEqual(merged["screenshot_count"], 0)
 
+    def test_config_test_tjupt_uses_shared_upload_url(self):
+        merged = merge_config(
+            Namespace(config=str(ROOT / "config-test.ini"), plugin="NexusPHP"),
+            "TJUpt",
+        )
+
+        self.assertEqual(merged["upload_url"], "https://tjupt.org/upload.php")
+
     def test_screenshot_tonemap_boolean_aliases(self):
         for value, expected in (("true", "always"), ("false", "never")):
             with self.subTest(value=value):
