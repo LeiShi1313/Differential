@@ -39,7 +39,13 @@ def remake_torrent(path: Path, tracker: str, old_torrent: str) -> Optional[bytes
 def make_torrent_progress(torrent, filepath, pieces_done, pieces_total):
     logger.info(f'制种进度: {pieces_done/pieces_total*100:3.0f} %')
 
-def make_torrent(path: Path, tracker: str, prefix: str = None, reuse_torrent: bool = True, from_torrent: str = None):
+def make_torrent(
+    path: Path,
+    tracker: str,
+    prefix: str = None,
+    reuse_torrent: bool = True,
+    from_torrent: str = None,
+) -> Path:
     torrent_name = path.resolve().parent.joinpath((f"[{prefix}]." if prefix else '') + f"{path.name if path.is_dir() else path.stem}.torrent")
     if from_torrent and Path(from_torrent).is_file():
         logger.info(f"正在基于{from_torrent}制作种子...")
@@ -48,7 +54,7 @@ def make_torrent(path: Path, tracker: str, prefix: str = None, reuse_torrent: bo
             with open(torrent_name, 'wb') as f:
                 f.write(torrent)
             logger.info(f"种子制作完成：{torrent_name.absolute()}")
-            return
+            return torrent_name
     if reuse_torrent:
         for f in path.resolve().parent.glob(f'*{path.name if path.is_dir() else path.stem}.torrent'):
             logger.info(f"正在基于{f.name}制作种子...")
@@ -57,7 +63,7 @@ def make_torrent(path: Path, tracker: str, prefix: str = None, reuse_torrent: bo
                 with open(torrent_name, 'wb') as f:
                     f.write(torrent)
                 logger.info(f"种子制作完成：{torrent_name.absolute()}")
-                return
+                return torrent_name
         
     logger.info("正在生成种子...")
     t = Torrent(path=path, trackers=[tracker],
@@ -67,3 +73,4 @@ def make_torrent(path: Path, tracker: str, prefix: str = None, reuse_torrent: bo
     t.generate(callback=make_torrent_progress, interval=1)
     t.write(torrent_name, overwrite=True)
     logger.info(f"种子制作完成：{torrent_name.absolute()}")
+    return torrent_name

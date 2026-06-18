@@ -1,4 +1,5 @@
 import base64
+from pathlib import Path
 from urllib.parse import quote
 from functools import reduce
 from differential.torrent import TorrnetBase
@@ -164,6 +165,17 @@ class AutoFeed(TorrnetBase):
         return ''
 
     @property
+    def torrent_name(self):
+        torrent_path = getattr(self.plugin, "torrent_path", None)
+        if not torrent_path:
+            return ""
+        return Path(torrent_path).name
+
+    @property
+    def torrent_url(self):
+        return getattr(self.plugin, "torrent_url", "") or ""
+
+    @property
     def _raw_info(self) -> dict:
         return {
             # 填充类信息
@@ -183,8 +195,8 @@ class AutoFeed(TorrnetBase):
             "anidb": "",  # 动漫特有
             "torrentName": "",  # 动漫辅助
             "images": self.screenshots if self.screenshots else '',  #  截图
-            "torrent_name": "",  # 用于转发内站
-            "torrent_url": "",  # 用于转发内站
+            "torrent_name": self.torrent_name,  # 用于转发内站
+            "torrent_url": self.torrent_url,  # 用于转发内站
             # 选择类信息
             "type": self.category,  # type:可取值——电影/纪录/体育/剧集/动画/综艺……
             "source_sel": self.area,  # 来源(地区)：可取值——欧美/大陆/港台/日本/韩国/印度……

@@ -15,6 +15,7 @@ from differential.torrent import TorrnetBase
 from differential.constants import ImageHosting
 from differential.utils.browser import open_link
 from differential.utils.torrent import make_torrent
+from differential.utils.torrent_handoff import torrent_file_to_base64, upload_torrent
 from differential.utils.parse import parse_encoder_log
 from differential.utils.uploader import EasyUpload, AutoFeed
 from differential.utils.mediainfo_handler import MediaInfoHandler
@@ -472,6 +473,9 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         )
 
         self.main_file: Optional[Path] = None
+        self.torrent_path: Optional[Path] = None
+        self.torrent_url = ""
+        self.torrent_data = ""
         self.ptgen: Optional[PTGenData] = None
         self.douban: Optional[DoubanData] = None
         self.imdb: Optional[IMDBData] = None
@@ -489,7 +493,11 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
                 logger.trace(f"已生成自动上传链接：{link}")
                 if self.trim_description:
                     logger.info(f"种子描述：\n{self.description}")
-                open_link(link, self.use_short_url)
+                use_short_url = self.use_short_url
+                if torrent_info.get("torrentData") and use_short_url:
+                    logger.warning("Easy Upload链接包含torrentData，已跳过短链接以避免把种子内容提交给短链接服务")
+                    use_short_url = False
+                open_link(link, use_short_url)
             elif self.auto_feed:
                 link = f"{self.upload_url}#{self.auto_feed_info}"
                 # if self.trim_description:
@@ -525,14 +533,21 @@ class Base(ABC, TorrnetBase, metaclass=PluginRegister):
         if self.generate_nfo:
             generate_nfo(self.folder, self.mediainfo_handler.media_info)
 
+        self.torrent_path = None
+        self.torrent_url = ""
+        self.torrent_data = ""
         if self.make_torrent:
-            make_torrent(
+            self.torrent_path = make_torrent(
                 self.folder,
                 self.announce_url,
                 self.__class__.__name__,
                 self.reuse_torrent,
                 self.from_torrent,
             )
+            if self.torrent_path and (getattr(self, "easy_upload", False) or getattr(self, "auto_feed", False)):
+                self.torrent_url = upload_torrent(self.torrent_path)
+                if getattr(self, "easy_upload", False):
+                    self.torrent_data = torrent_file_to_base64(self.torrent_path)
 
     def _search_and_fetch_ptgen_info(self):
         parsed = parse_media_name(self.folder)

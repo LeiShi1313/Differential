@@ -344,6 +344,107 @@ class BasePluginIsoWorkflowTest(unittest.TestCase):
         generate_nfo.assert_called_once_with(iso, "media info")
         self.assertEqual(make_torrent.call_args.args[0], iso)
 
+    def test_prepare_uploads_generated_torrent_for_browser_handoff(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "Movie"
+            folder.mkdir()
+            main_file = folder / "movie.mkv"
+            main_file.write_bytes(b"video")
+            torrent_path = folder / "[Tracker].Movie.torrent"
+
+            plugin = SimpleNamespace(
+                folder=folder,
+                url="https://movie.douban.com/subject/123/",
+                announce_url="https://tracker.example/announce",
+                reuse_torrent=True,
+                from_torrent=None,
+                generate_nfo=False,
+                make_torrent=True,
+                easy_upload=True,
+                auto_feed=False,
+                mediainfo_handler=SimpleNamespace(
+                    find_mediainfo=mock.Mock(return_value=main_file),
+                    resolution="1080p",
+                    duration=1000,
+                    tracks=[],
+                ),
+                ptgen_handler=SimpleNamespace(fetch_ptgen_info=mock.Mock(return_value=(None, None, None))),
+                screenshot_handler=SimpleNamespace(collect_screenshots=mock.Mock()),
+            )
+
+            with mock.patch("differential.base_plugin.make_torrent", return_value=torrent_path), mock.patch(
+                "differential.base_plugin.upload_torrent",
+                return_value="https://r.leishi.xyz/torrent/abc123",
+            ) as upload_torrent, mock.patch(
+                "differential.base_plugin.torrent_file_to_base64",
+                return_value="VE9SUkVOVA==",
+            ) as torrent_file_to_base64:
+                Base._prepare(plugin)
+
+        self.assertEqual(plugin.torrent_path, torrent_path)
+        self.assertEqual(plugin.torrent_url, "https://r.leishi.xyz/torrent/abc123")
+        self.assertEqual(plugin.torrent_data, "VE9SUkVOVA==")
+        upload_torrent.assert_called_once_with(torrent_path)
+        torrent_file_to_base64.assert_called_once_with(torrent_path)
+
+    def test_prepare_skips_torrent_upload_without_browser_handoff(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / "Movie"
+            folder.mkdir()
+            main_file = folder / "movie.mkv"
+            main_file.write_bytes(b"video")
+            torrent_path = folder / "[Tracker].Movie.torrent"
+
+            plugin = SimpleNamespace(
+                folder=folder,
+                url="https://movie.douban.com/subject/123/",
+                announce_url="https://tracker.example/announce",
+                reuse_torrent=True,
+                from_torrent=None,
+                generate_nfo=False,
+                make_torrent=True,
+                easy_upload=False,
+                auto_feed=False,
+                mediainfo_handler=SimpleNamespace(
+                    find_mediainfo=mock.Mock(return_value=main_file),
+                    resolution="1080p",
+                    duration=1000,
+                    tracks=[],
+                ),
+                ptgen_handler=SimpleNamespace(fetch_ptgen_info=mock.Mock(return_value=(None, None, None))),
+                screenshot_handler=SimpleNamespace(collect_screenshots=mock.Mock()),
+            )
+
+            with mock.patch("differential.base_plugin.make_torrent", return_value=torrent_path), mock.patch(
+                "differential.base_plugin.upload_torrent"
+            ) as upload_torrent, mock.patch("differential.base_plugin.torrent_file_to_base64") as torrent_file_to_base64:
+                Base._prepare(plugin)
+
+        self.assertEqual(plugin.torrent_path, torrent_path)
+        self.assertEqual(plugin.torrent_url, "")
+        self.assertEqual(plugin.torrent_data, "")
+        upload_torrent.assert_not_called()
+        torrent_file_to_base64.assert_not_called()
+
+    def test_easy_upload_torrent_data_disables_url_shortener(self):
+        plugin = SimpleNamespace(
+            _prepare=mock.Mock(),
+            mediainfo_handler=SimpleNamespace(cleanup=mock.Mock()),
+            easy_upload=True,
+            auto_feed=False,
+            easy_upload_torrent_info={"title": "Movie", "torrentData": "VE9SUkVOVA=="},
+            trim_description=False,
+            upload_url="https://tracker.example/upload.php",
+            use_short_url=True,
+        )
+
+        with mock.patch("differential.base_plugin.open_link") as open_link:
+            Base.upload(plugin)
+
+        open_link.assert_called_once()
+        self.assertIn("torrentData", open_link.call_args.args[0])
+        self.assertFalse(open_link.call_args.args[1])
+
     def test_prepare_searches_media_when_url_is_omitted(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp) / "[两心不疑].No.Doubt.in.Us.2026.S01.Complete"

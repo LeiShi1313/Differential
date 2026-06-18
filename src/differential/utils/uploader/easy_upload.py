@@ -156,7 +156,7 @@ class EasyUpload(TorrnetBase):
 
     @property
     def torrent_info(self) -> dict:
-        return {
+        info = {
             "title": self.title,
             "subtitle": self.subtitle,
             "description": self.description,
@@ -186,3 +186,10 @@ class EasyUpload(TorrnetBase):
             "isForbidden": False,
             "sourceSiteType": "NexusPHP",
         }
+        torrent_data = getattr(self.plugin, "torrent_data", "") or ""
+        torrent_url = getattr(self.plugin, "torrent_url", "") or ""
+        if torrent_data:
+            info["torrentData"] = torrent_data
+        if torrent_url:
+            info["torrentUrl"] = torrent_url
+        return info

@@ -70,6 +70,17 @@ class EasyUploadTest(unittest.TestCase):
         self.assertEqual(info["audioCodec"], "dd+")
         self.assertEqual(info["resolution"], "2160p")
 
+    def test_payload_includes_torrent_data_and_url_when_available(self):
+        info = EasyUpload(
+            make_plugin(
+                torrent_data="VE9SUkVOVA==",
+                torrent_url="https://r.leishi.xyz/torrent/abc123",
+            )
+        ).torrent_info
+
+        self.assertEqual(info["torrentData"], "VE9SUkVOVA==")
+        self.assertEqual(info["torrentUrl"], "https://r.leishi.xyz/torrent/abc123")
+
     def test_media_variants_are_canonicalized_for_easy_upload(self):
         cases = [
             (

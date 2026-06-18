@@ -50,6 +50,19 @@ class AutoFeedTest(unittest.TestCase):
         self.assertEqual(info["audiocodec_sel"], "AC3")
         self.assertIn("DDP5.1", info["name"])
 
+    def test_payload_includes_torrent_url_handoff_fields(self):
+        info = decode_info(
+            AutoFeed(
+                make_plugin(
+                    torrent_path=Path("/tmp/[Tracker].Movie.torrent"),
+                    torrent_url="https://r.leishi.xyz/torrent/abc123",
+                )
+            ).info
+        )
+
+        self.assertEqual(info["torrent_name"], "[Tracker].Movie.torrent")
+        self.assertEqual(info["torrent_url"], "https://r.leishi.xyz/torrent/abc123")
+
     def test_media_variants_are_canonicalized_for_auto_feed_js(self):
         cases = [
             (
