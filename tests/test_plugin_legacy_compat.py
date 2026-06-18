@@ -67,6 +67,12 @@ class LegacyPluginCompatTest(unittest.TestCase):
         self.assertEqual(plugin._screenshots, [screenshot])
         self.assertEqual(plugin._imdb["genre"], ["Drama"])
 
+    def test_pterclub_uses_current_upload_domain(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plugin = PTerClub(folder=tmp)
+
+        self.assertEqual(plugin.upload_url, "https://pterclub.net/upload.php")
+
     def test_hdbits_uses_legacy_aliases_for_description(self):
         with tempfile.TemporaryDirectory() as tmp:
             plugin = HDBits(folder=tmp)

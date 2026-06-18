@@ -18,4 +18,4 @@ class PTerClub(NexusPHP):
         return super().add_parser(parser)
 
     def __init__(self, **kwargs):
-        super().__init__(upload_url="https://pterclub.com/upload.php", **kwargs)
+        super().__init__(upload_url="https://pterclub.net/upload.php", **kwargs)
